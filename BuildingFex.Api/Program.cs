@@ -46,9 +46,9 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
-RailwayHosting.ConfigureKestrelPort(builder);
-RailwayHosting.ApplySecretsFromEnvironment(builder);
-RailwayHosting.ValidateProductionSecrets(builder.Configuration, builder.Environment);
+CloudHosting.ConfigureKestrelPort(builder);
+CloudHosting.ApplySecretsFromEnvironment(builder);
+CloudHosting.ValidateProductionSecrets(builder.Configuration, builder.Environment);
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -121,7 +121,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    var connectionString = RailwayHosting.ResolveConnectionString(builder.Configuration);
+    var connectionString = CloudHosting.ResolveConnectionString(builder.Configuration, builder.Environment);
     options.UseMySQL(connectionString);
 });
 
@@ -210,7 +210,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-if (app.Environment.IsDevelopment() || RailwayHosting.IsRailwayDeployment())
+if (app.Environment.IsDevelopment() || CloudHosting.IsPlatformDeployment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -218,7 +218,7 @@ if (app.Environment.IsDevelopment() || RailwayHosting.IsRailwayDeployment())
 
 app.UseForwardedHeaders();
 app.UseCors("AllowFrontend");
-if (!app.Environment.IsDevelopment() && !RailwayHosting.IsRailwayDeployment())
+if (!app.Environment.IsDevelopment() && !CloudHosting.IsPlatformDeployment())
     app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

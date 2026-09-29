@@ -55,6 +55,30 @@ Cada módulo de negocio sigue las mismas 4 capas:
 6. **Registra** el módulo en `Program.cs` y en `AppDbContext.OnModelCreating`.
 7. **Crea la migración**: `dotnet ef migrations add NombreModulo`.
 
+## Despliegue
+
+El proyecto se despliega como un contenedor Docker. Hay blueprints listos para los dos proveedores que usa el equipo.
+
+### Render
+
+1. En Render: **New → Blueprint**, apuntando a este repositorio. Render lee `render.yaml` y crea el servicio.
+2. Completá las variables marcadas con `sync: false` en **Environment**. Son las que no se pueden generar solas.
+3. Listo. Render expone `PORT` solo y la API escucha ahí.
+
+La variable crítica es `ConnectionStrings__DefaultConnection`. Render no ofrece MySQL gestionado (solo PostgreSQL), así que la base sigue en Railway o en otro proveedor externo: copiá su connection string público.
+
+Si la API no arranca con *"Missing JWT secret"*, es que `TokenSettings__Secret` no llegó a las variables de entorno. Ese mensaje aparece cuando la app corre fuera de Development sin un secreto JWT válido.
+
+Si aparece *"points at localhost"*, la variable de conexión no se tomó y la app cayó en el valor por defecto de `appsettings.json`, que apunta a `localhost` y no funciona dentro de un contenedor.
+
+### Railway
+
+`railway.toml` configura el build con `Dockerfile` y el health check en `/health`. Las variables se cargan desde el panel del servicio.
+
+### Variables de entorno
+
+`deploy.env.example` documenta todas las variables con su formato esperado. Ningún secreto real debe subirse al repositorio.
+
 ## Requisitos
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)

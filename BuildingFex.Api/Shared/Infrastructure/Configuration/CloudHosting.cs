@@ -1,7 +1,7 @@
 
 namespace BuildingFex.Api.Shared.Infrastructure.Configuration;
 
-public static class RailwayHosting
+public static class CloudHosting
 {
     public static void ConfigureKestrelPort(WebApplicationBuilder builder)
     {
@@ -10,18 +10,29 @@ public static class RailwayHosting
             builder.WebHost.UseUrls($"http://+:{port}");
     }
 
-    public static string ResolveConnectionString(IConfiguration configuration)
+    public static string ResolveConnectionString(
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
-        var railwayConnection = TryBuildFromRailwayEnv();
-        if (railwayConnection is not null)
-            return railwayConnection;
+        var platformConnection = TryBuildFromPlatformEnv();
+        if (platformConnection is not null)
+            return platformConnection;
 
         var configured = configuration.GetConnectionString("DefaultConnection");
-        if (!string.IsNullOrWhiteSpace(configured))
-            return configured;
+        if (string.IsNullOrWhiteSpace(configured))
+            throw new InvalidOperationException(
+                "Database connection is not configured. Set ConnectionStrings__DefaultConnection " +
+                "in your host's environment variables, or provide the platform MySQL variables.");
 
-        throw new InvalidOperationException(
-            "Database connection is not configured. Set ConnectionStrings__DefaultConnection or Railway MySQL variables.");
+        if (!environment.IsDevelopment() && IsLoopback(configured))
+        {
+            throw new InvalidOperationException(
+                "The configured database connection points at localhost, which cannot work once the API " +
+                "runs in a container or on a remote host. Set ConnectionStrings__DefaultConnection in your " +
+                "host's environment variables to the public connection string of your MySQL database.");
+        }
+
+        return configured;
     }
 
     public static void ApplySecretsFromEnvironment(WebApplicationBuilder builder)
@@ -73,16 +84,18 @@ public static class RailwayHosting
             secret.Length < 32)
         {
             throw new InvalidOperationException(
-                "Missing JWT secret for production. In Railway → your API service → Variables, add " +
-                "TokenSettings__Secret (or JWT_SECRET) with a random string of at least 32 characters, then redeploy.");
+                "Missing JWT secret. In your host's environment variables, add TokenSettings__Secret " +
+                "(or JWT_SECRET) with a random string of at least 32 characters, then redeploy. " +
+                "You can generate one with: openssl rand -base64 48");
         }
     }
 
-    public static bool IsRailwayDeployment() =>
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT"))
-        || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PORT"));
+    public static bool IsPlatformDeployment() =>
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT")) ||
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RENDER")) ||
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PORT"));
 
-    private static string? TryBuildFromRailwayEnv()
+    private static string? TryBuildFromPlatformEnv()
     {
         var mysqlUrl = Environment.GetEnvironmentVariable("MYSQL_URL")
             ?? Environment.GetEnvironmentVariable("DATABASE_URL");
@@ -104,6 +117,35 @@ public static class RailwayHosting
         }
 
         return $"server={host};port={port};user={user};password={password};database={database}";
+    }
+
+    private static bool IsLoopback(string connectionString)
+    {
+        foreach (var part in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = part.IndexOf('=');
+            if (separator <= 0)
+                continue;
+
+            var key = part[..separator].Trim();
+            if (!key.Equals("server", StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals("host", StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals("data source", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var value = part[(separator + 1)..].Trim().Trim('"', '\'');
+            if (value.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("127.0.0.1", StringComparison.Ordinal) ||
+                value.Equals("::1", StringComparison.Ordinal) ||
+                value.Equals("0.0.0.0", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string? FirstEnv(params string[] keys)

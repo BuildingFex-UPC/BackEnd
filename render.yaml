@@ -1,0 +1,50 @@
+# Render Blueprint para BuildingFex API.
+#
+# Uso: New → Blueprint en Render, apuntando a este repositorio.
+# Después completá las variables marcadas con `sync: false` desde el panel.
+#
+# Render no ofrece MySQL gestionado (solo PostgreSQL), así que la base de datos
+# sigue viva en Railway. Copiá el connection string público de Railway MySQL.
+
+services:
+  - type: web
+    name: buildingfex-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # Render genera un string aleatorio por ti. También podés pegarlo a mano
+      # con: openssl rand -base64 48
+      - key: TokenSettings__Secret
+        generateValue: true
+
+      # Connection string público de tu MySQL (Railway MySQL u otro proveedor).
+      # Debe verse así: server=X;port=3306;user=U;password=P;database=D
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+
+      - key: MercadoPago__AccessToken
+        sync: false
+      - key: MercadoPago__PublicKey
+        sync: false
+      - key: MercadoPago__WebhookSecret
+        sync: false
+
+      # Origen del frontend (Vercel u otro), separado por coma si hay varios.
+      - key: MercadoPago__FrontendBaseUrl
+        sync: false
+
+      # Debe apuntar a Render, NO a Railway:
+      # https://buildingfex-api.onrender.com/api/v1/payments/webhook
+      - key: MercadoPago__NotificationUrl
+        sync: false
+
+      # Origenes permitidos por CORS. Sin esto, cualquier origen es aceptado.
+      - key: Cors__AllowedOrigins
+        sync: false
