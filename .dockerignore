@@ -1,0 +1,13 @@
+**/.git
+**/.vs
+**/.idea
+**/bin
+**/obj
+**/packages
+**/*.user
+**/*.suo
+**/appsettings.Local.json
+**/.env
+**/terminals
+**/agent-transcripts
+**/assets

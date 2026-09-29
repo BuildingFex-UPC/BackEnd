@@ -1,0 +1,54 @@
+{
+  "users": [
+    {
+      "id": "admin-seed-1",
+      "name": "Admin BuildingFex",
+      "email": "admin@buildingfex.test",
+      "password": "admin123",
+      "role": "admin",
+      "dni": "12345678",
+      "address": "Av. Principal 123",
+      "company": "BuildingFex SAC",
+      "ruc": "20123456789"
+    },
+    {
+      "id": "resident-seed-1",
+      "name": "Residente Prueba",
+      "email": "residente@buildingfex.test",
+      "password": "residente123",
+      "role": "resident",
+      "floor": "3",
+      "code": "301",
+      "ownerAdminId": "admin-seed-1",
+      "admissionDate": "2025-01-15"
+    }
+  ],
+  "incidents": [],
+  "payments": [],
+  "fees": [],
+  "receipts": [
+    {
+      "id": "receipt-seed-1",
+      "residentId": "resident-seed-1",
+      "ownerAdminId": "admin-seed-1",
+      "issueDate": "2026-06-01",
+      "dueDate": "2026-07-31",
+      "amount": 150,
+      "status": "Pending",
+      "lateFee": 0,
+      "extraCharges": 0,
+      "concept": "Mantenimiento Junio 2026"
+    }
+  ],
+  "financeSettings": [
+    {
+      "id": "finance-settings-seed-1",
+      "ownerAdminId": "admin-seed-1",
+      "baseMonthlyExpense": 150,
+      "lateFeeRate": 0.05
+    }
+  ],
+  "spaces": [],
+  "reservations": [],
+  "announcements": []
+}
