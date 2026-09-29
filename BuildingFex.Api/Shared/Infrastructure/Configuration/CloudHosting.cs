@@ -203,11 +203,31 @@ public static class CloudHosting
         var user = Uri.UnescapeDataString(userInfo[0]);
         var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
         var database = uri.AbsolutePath.Trim('/');
+
+        // The scheme was rewritten to http:// so Uri.Port falls back to 80 when the
+        // URL omits its port. PostgreSQL connection strings commonly omit it, so
+        // detect the omission from the authority instead of trusting uri.Port.
         var host = uri.Host;
-        var port = uri.Port > 0 ? uri.Port : 5432;
+        var port = HasExplicitPort(uri.Authority) ? uri.Port : 5432;
         var sslMode = QueryValue(uri.Query, "sslmode");
 
         return BuildConnectionString(host, port.ToString(), user, password, database, sslMode);
+    }
+
+    private static bool HasExplicitPort(string authority)
+    {
+        if (string.IsNullOrEmpty(authority))
+            return false;
+
+        if (authority.StartsWith('['))
+        {
+            var closingBracket = authority.IndexOf(']');
+            return closingBracket >= 0 &&
+                   closingBracket + 1 < authority.Length &&
+                   authority[closingBracket + 1] == ':';
+        }
+
+        return authority.Contains(':');
     }
 
     private static string BuildConnectionString(
