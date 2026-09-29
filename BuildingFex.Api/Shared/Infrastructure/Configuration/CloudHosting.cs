@@ -22,14 +22,14 @@ public static class CloudHosting
         if (string.IsNullOrWhiteSpace(configured))
             throw new InvalidOperationException(
                 "Database connection is not configured. Set ConnectionStrings__DefaultConnection " +
-                "in your host's environment variables, or provide the platform MySQL variables.");
+                "in your host's environment variables.");
 
         if (!environment.IsDevelopment() && IsLoopback(configured))
         {
             throw new InvalidOperationException(
                 "The configured database connection points at localhost, which cannot work once the API " +
                 "runs in a container or on a remote host. Set ConnectionStrings__DefaultConnection in your " +
-                "host's environment variables to the public connection string of your MySQL database.");
+                "host's environment variables to the connection string of your database.");
         }
 
         return configured;
@@ -65,7 +65,7 @@ public static class CloudHosting
         var connectionString = FirstEnv(
             "ConnectionStrings__DefaultConnection",
             "DATABASE_CONNECTION",
-            "MYSQL_CONNECTION");
+            "PG_CONNECTION");
         if (!string.IsNullOrWhiteSpace(connectionString))
             builder.Configuration["ConnectionStrings:DefaultConnection"] = connectionString;
     }
@@ -96,6 +96,11 @@ public static class CloudHosting
             "Generate one with: openssl rand -base64 48");
     }
 
+    public static bool IsPlatformDeployment() =>
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT")) ||
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RENDER")) ||
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PORT"));
+
     private static string DescribeSecretSources()
     {
         var found = JwtSecretKeys
@@ -117,23 +122,20 @@ public static class CloudHosting
         "TOKEN_SETTINGS_SECRET",
     ];
 
-    public static bool IsPlatformDeployment() =>
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT")) ||
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RENDER")) ||
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PORT"));
-
     private static string? TryBuildFromPlatformEnv()
     {
-        var mysqlUrl = Environment.GetEnvironmentVariable("MYSQL_URL")
-            ?? Environment.GetEnvironmentVariable("DATABASE_URL");
-        if (!string.IsNullOrWhiteSpace(mysqlUrl) && mysqlUrl.StartsWith("mysql://", StringComparison.OrdinalIgnoreCase))
-            return ParseMySqlUrl(mysqlUrl);
+        var databaseUrl = FirstEnv("DATABASE_URL", "POSTGRES_URL");
+        if (!string.IsNullOrWhiteSpace(databaseUrl) &&
+            databaseUrl.StartsWith("postgres", StringComparison.OrdinalIgnoreCase))
+        {
+            return ParsePostgresUrl(databaseUrl);
+        }
 
-        var host = FirstEnv("MYSQLHOST", "MYSQL_HOST");
-        var port = FirstEnv("MYSQLPORT", "MYSQL_PORT") ?? "3306";
-        var user = FirstEnv("MYSQLUSER", "MYSQL_USER");
-        var password = FirstEnv("MYSQLPASSWORD", "MYSQL_PASSWORD", "MYSQL_ROOT_PASSWORD");
-        var database = FirstEnv("MYSQLDATABASE", "MYSQL_DATABASE");
+        var host = FirstEnv("PGHOST", "PG_HOST");
+        var port = FirstEnv("PGPORT", "PG_PORT") ?? "5432";
+        var user = FirstEnv("PGUSER", "PG_USER");
+        var password = FirstEnv("PGPASSWORD", "PG_PASSWORD");
+        var database = FirstEnv("PGDATABASE", "PG_DB");
 
         if (string.IsNullOrWhiteSpace(host) ||
             string.IsNullOrWhiteSpace(user) ||
@@ -143,7 +145,7 @@ public static class CloudHosting
             return null;
         }
 
-        return $"server={host};port={port};user={user};password={password};database={database}";
+        return BuildConnectionString(host, port, user, password, database, null);
     }
 
     private static bool IsLoopback(string connectionString)
@@ -155,14 +157,15 @@ public static class CloudHosting
                 continue;
 
             var key = part[..separator].Trim();
-            if (!key.Equals("server", StringComparison.OrdinalIgnoreCase) &&
-                !key.Equals("host", StringComparison.OrdinalIgnoreCase) &&
+            if (!key.Equals("Host", StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals("Server", StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals("server", StringComparison.OrdinalIgnoreCase) &&
                 !key.Equals("data source", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var value = part[(separator + 1)..].Trim().Trim('"', '\'');
+            var value = Unquote(part[(separator + 1)..].Trim());
             if (value.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
                 value.Equals("127.0.0.1", StringComparison.Ordinal) ||
                 value.Equals("::1", StringComparison.Ordinal) ||
@@ -175,6 +178,117 @@ public static class CloudHosting
         return false;
     }
 
+    private static string ParsePostgresUrl(string url)
+    {
+        var normalized = url;
+        if (normalized.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+            normalized = "http://" + normalized["postgresql://".Length..];
+        else if (normalized.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+            normalized = "http://" + normalized["postgres://".Length..];
+
+        Uri uri;
+        try
+        {
+            uri = new Uri(normalized);
+        }
+        catch (UriFormatException ex)
+        {
+            throw new InvalidOperationException(
+                "DATABASE_URL could not be parsed as a PostgreSQL connection string. " +
+                "It must look like postgresql://user:password@host:5432/database, with the " +
+                "password percent-encoded if it contains '@', '/', or ':'.", ex);
+        }
+
+        var userInfo = uri.UserInfo.Split(':', 2);
+        var user = Uri.UnescapeDataString(userInfo[0]);
+        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
+        var database = uri.AbsolutePath.Trim('/');
+        var host = uri.Host;
+        var port = uri.Port > 0 ? uri.Port : 5432;
+        var sslMode = QueryValue(uri.Query, "sslmode");
+
+        return BuildConnectionString(host, port.ToString(), user, password, database, sslMode);
+    }
+
+    private static string BuildConnectionString(
+        string host,
+        string port,
+        string user,
+        string password,
+        string database,
+        string? sslMode)
+    {
+        var parts = new List<string>
+        {
+            $"Host={Quote(host)}",
+            $"Port={Quote(port)}",
+            $"Database={Quote(database)}",
+            $"Username={Quote(user)}",
+            $"Password={Quote(password)}",
+        };
+
+        var ssl = MapSslMode(sslMode);
+        if (ssl is not null)
+            parts.Add($"SSL Mode={ssl}");
+
+        return string.Join(";", parts);
+    }
+
+    private static string? MapSslMode(string? sslMode)
+    {
+        if (string.IsNullOrWhiteSpace(sslMode))
+            return null;
+
+        return sslMode.ToLowerInvariant() switch
+        {
+            "require" or "verify-ca" or "verify-full" => "Require",
+            "prefer" => "Prefer",
+            "allow" => "Allow",
+            "disable" => "Disable",
+            _ => null,
+        };
+    }
+
+    private static string? QueryValue(string query, string key)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return null;
+
+        foreach (var pair in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = pair.Split('=', 2);
+            if (parts.Length != 2)
+                continue;
+
+            if (parts[0].Equals(key, StringComparison.OrdinalIgnoreCase))
+                return Uri.UnescapeDataString(parts[1]);
+        }
+
+        return null;
+    }
+
+    private static string Quote(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "''";
+
+        if (value.Contains('\''))
+            return "'" + value.Replace("'", "''") + "'";
+
+        if (value.Any(c => c is ';' or '=' or ' ' or '"'))
+            return "'" + value + "'";
+
+        return value;
+    }
+
+    private static string Unquote(string value)
+    {
+        if (value.Length >= 2 && value.StartsWith('\'') && value.EndsWith('\''))
+            return value[1..^1].Replace("''", "'");
+
+        return value;
+    }
+
     private static string? FirstEnv(params string[] keys)
     {
         foreach (var key in keys)
@@ -185,18 +299,5 @@ public static class CloudHosting
         }
 
         return null;
-    }
-
-    private static string ParseMySqlUrl(string url)
-    {
-        var uri = new Uri(url);
-        var userInfo = uri.UserInfo.Split(':', 2);
-        var user = Uri.UnescapeDataString(userInfo[0]);
-        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
-        var database = uri.AbsolutePath.TrimStart('/');
-        var host = uri.Host;
-        var port = uri.Port > 0 ? uri.Port : 3306;
-
-        return $"server={host};port={port};user={user};password={password};database={database}";
     }
 }

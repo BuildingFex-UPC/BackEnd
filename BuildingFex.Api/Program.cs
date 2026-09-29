@@ -122,7 +122,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     var connectionString = CloudHosting.ResolveConnectionString(builder.Configuration, builder.Environment);
-    options.UseMySQL(connectionString);
+    options.UseNpgsql(connectionString);
 });
 
 // Shared
@@ -175,8 +175,7 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     
-    // Usamos EnsureCreated en vez de Migrate para evitar el bug de GET_LOCK(-1) 
-    // que ocurre al usar XAMPP (MariaDB) con el proveedor de Oracle MySQL.
+    // EnsureCreated crea el esquema desde el modelo cuando la base esta vacia.
     context.Database.EnsureCreated();
 
     var seedPath = builder.Configuration["Seed:DbJsonPath"];

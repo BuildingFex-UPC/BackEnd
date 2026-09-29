@@ -8,12 +8,12 @@ Backend oficial de la aplicación **BuildingFex**. Proyecto independiente del fr
 |---------|-----|
 | `Fronted-1` | App web (Vue 3) — ya existe |
 | `learning-center-platform` | Referencia de arquitectura — **no se modifica** |
-| `buildingfex-api` | **Este proyecto** — API REST real con MySQL |
+| `buildingfex-api` | **Este proyecto** — API REST real con PostgreSQL |
 
 ## Stack
 
 - **C# / .NET 10** + ASP.NET Core
-- **Entity Framework Core** + **MySQL**
+- **Entity Framework Core** + **PostgreSQL**
 - **JWT** + **BCrypt** (autenticación)
 - **Swagger** (documentación)
 - Arquitectura **DDD** + **CQRS** por bounded contexts
@@ -57,23 +57,16 @@ Cada módulo de negocio sigue las mismas 4 capas:
 
 ## Despliegue
 
-El proyecto se despliega como un contenedor Docker. Hay blueprints listos para los dos proveedores que usa el equipo.
+El proyecto se despliega como un contenedor Docker sobre Render, con PostgreSQL gestionado por Render.
 
 ### Render
 
 1. En Render: **New → Blueprint**, apuntando a este repositorio. Render lee `render.yaml` y crea el servicio.
-2. Completá las variables marcadas con `sync: false` en **Environment**. Son las que no se pueden generar solas.
-3. Listo. Render expone `PORT` solo y la API escucha ahí.
+2. Crear el Postgres (New → Postgres). **Los Postgres free expiran a los 30 días** y Render borra la base con sus datos; hay que regenerarla o subir a un plan de pago.
+3. Completar las variables marcadas con `sync: false` en **Environment**, sobre todo `ConnectionStrings__DefaultConnection`.
+4. Listo. Render expone `PORT` solo y la API escucha ahí.
 
-La variable crítica es `ConnectionStrings__DefaultConnection`. Render no ofrece MySQL gestionado (solo PostgreSQL), así que la base sigue en Railway o en otro proveedor externo: copiá su connection string público.
-
-Si la API no arranca con *"Missing JWT secret"*, es que `TokenSettings__Secret` no llegó a las variables de entorno. Ese mensaje aparece cuando la app corre fuera de Development sin un secreto JWT válido.
-
-Si aparece *"points at localhost"*, la variable de conexión no se tomó y la app cayó en el valor por defecto de `appsettings.json`, que apunta a `localhost` y no funciona dentro de un contenedor.
-
-### Railway
-
-`railway.toml` configura el build con `Dockerfile` y el health check en `/health`. Las variables se cargan desde el panel del servicio.
+La variable crítica es `ConnectionStrings__DefaultConnection`, en formato `Host=X;Port=5432;Database=D;Username=U;Password=P`. Si la API no arranca con *"Missing JWT secret"*, es que `TokenSettings__Secret` no llegó a las variables de entorno. Si aparece *"points at localhost"*, la conexión no se tomó y la app cayó al valor por defecto de `appsettings.json`.
 
 ### Variables de entorno
 
@@ -82,12 +75,12 @@ Si aparece *"points at localhost"*, la variable de conexión no se tomó y la ap
 ## Requisitos
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- MySQL 8 (local o Docker)
+- PostgreSQL 17 (local o Docker)
 
 ## Inicio rápido (Fases 1–5 — IAM + Residentes + Incidencias + Finanzas + SocialSpaces)
 
 ```bash
-# 1. Levantar MySQL (Docker)
+# 1. Levantar PostgreSQL (Docker)
 docker compose up -d
 
 # 2. Restaurar, compilar y ejecutar API

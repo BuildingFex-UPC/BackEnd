@@ -1,23 +1,30 @@
 param(
-    [string]$MySqlPassword = ""
+    [string]$PostgresPassword = "buildingfex"
 )
 
 $ErrorActionPreference = "Stop"
 $apiDir = Join-Path $PSScriptRoot "BuildingFex.Api"
 $localConfig = Join-Path $apiDir "appsettings.Local.json"
 
-if (-not $MySqlPassword) {
-    Write-Host "Configuracion local de BuildingFex (MySQL + Mercado Pago)" -ForegroundColor Cyan
+if (-not $PostgresPassword) {
+    Write-Host "Configuracion local de BuildingFex (PostgreSQL + Mercado Pago)" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "MySQL 8 esta instalado en tu PC. Ingresa la contraseña del usuario root."
-    Write-Host "(La que definiste al instalar MySQL; dejala vacia y Enter si no tiene contraseña)"
-    $secure = Read-Host "MySQL root password" -AsSecureString
-    $MySqlPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+    Write-Host "PostgreSQL esta corriendo en tu PC (docker compose up -d)."
+    Write-Host "Ingresa la contrasena del usuario postgres."
+    $secure = Read-Host "Postgres password" -AsSecureString
+    $PostgresPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
         [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
 }
 
-$escaped = $MySqlPassword.Replace("'", "''")
-$connection = "server=localhost;port=3306;user=root;password=$escaped;database=buildingfex"
+function ConvertTo-NpgsqlValue([string]$value) {
+    if ([string]::IsNullOrEmpty($value)) { return "''" }
+    if ($value.Contains("'")) { return "'" + $value.Replace("'", "''") + "'" }
+    if ($value -match '[;=\s"]') { return "'" + $value + "'" }
+    return $value
+}
+
+$connection = "Host=localhost;Port=5432;Database=buildingfex;Username=postgres;Password=" +
+    (ConvertTo-NpgsqlValue $PostgresPassword)
 
 $mpAccessToken = $env:MP_ACCESS_TOKEN
 $mpPublicKey = $env:MP_PUBLIC_KEY
@@ -52,6 +59,7 @@ Write-Host ""
 Write-Host "Listo: $localConfig" -ForegroundColor Green
 Write-Host ""
 Write-Host "Siguiente paso:"
+Write-Host "  docker compose up -d"
 Write-Host "  cd BuildingFex.Api"
 Write-Host "  dotnet run"
 Write-Host ""

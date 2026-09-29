@@ -31,7 +31,7 @@ Iam/
 ├── Domain/Repositories/IUserRepository.cs
 ├── Application/CommandServices/         ← login, registro
 ├── Application/QueryServices/           ← consultas
-├── Infrastructure/Persistence/          ← EF Core + MySQL + seed db.json
+├── Infrastructure/Persistence/          ← EF Core + PostgreSQL + seed db.json
 └── Interfaces/Rest/                     ← controllers
 ```
 

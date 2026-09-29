@@ -62,7 +62,8 @@ dotnet restore
 dotnet build
 dotnet run
 
-# Migraciones (cuando MySQL esté corriendo)
-dotnet ef migrations add NombreCambio
-dotnet ef database update
+# El esquema lo crea EnsureCreated al arrancar si la base esta vacia.
+# Si en algun momento pasas a Migrate():
+#   dotnet ef migrations add NombreCambio
+#   dotnet ef database update
 ```

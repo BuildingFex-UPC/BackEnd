@@ -7,7 +7,7 @@ if not exist "BuildingFex.Api\appsettings.Local.json" (
   exit /b 1
 )
 
-echo [1/3] MySQL: usa tu instalacion local ^(MySQL80^) o Docker ^(docker compose up -d^)
+echo [1/3] PostgreSQL: usa tu instalacion local ^(PostgreSQL 17^) o Docker ^(docker compose up -d^)
 echo [2/3] Compilando API...
 cd BuildingFex.Api
 dotnet build -v q

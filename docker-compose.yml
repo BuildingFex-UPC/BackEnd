@@ -1,15 +1,16 @@
 services:
-  mysql:
-    image: mysql:8.4
-    container_name: buildingfex-mysql
+  postgres:
+    image: postgres:17
+    container_name: buildingfex-postgres
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: buildingfex
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: buildingfex
+      POSTGRES_DB: buildingfex
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - buildingfex_mysql_data:/var/lib/mysql
+      - buildingfex_postgres_data:/var/lib/postgresql/data
 
 volumes:
-  buildingfex_mysql_data:
+  buildingfex_postgres_data:

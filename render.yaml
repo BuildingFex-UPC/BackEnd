@@ -3,8 +3,8 @@
 # Uso: New → Blueprint en Render, apuntando a este repositorio.
 # Después completá las variables marcadas con `sync: false` desde el panel.
 #
-# Render no ofrece MySQL gestionado (solo PostgreSQL), así que la base de datos
-# sigue viva en Railway. Copiá el connection string público de Railway MySQL.
+# La base de datos es PostgreSQL de Render (el API usa Npgsql).
+# Formato: Host=X;Port=5432;Database=D;Username=U;Password=P
 
 services:
   - type: web
@@ -24,8 +24,7 @@ services:
       - key: TokenSettings__Secret
         generateValue: true
 
-      # Connection string público de tu MySQL (Railway MySQL u otro proveedor).
-      # Debe verse así: server=X;port=3306;user=U;password=P;database=D
+      # Host/Port/Database/Username/Password del Postgres de Render.
       - key: ConnectionStrings__DefaultConnection
         sync: false
 
