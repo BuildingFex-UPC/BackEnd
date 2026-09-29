@@ -19,18 +19,33 @@ if (-not $MySqlPassword) {
 $escaped = $MySqlPassword.Replace("'", "''")
 $connection = "server=localhost;port=3306;user=root;password=$escaped;database=buildingfex"
 
+$mpAccessToken = $env:MP_ACCESS_TOKEN
+$mpPublicKey = $env:MP_PUBLIC_KEY
+$mpWebhookSecret = $env:MP_WEBHOOK_SECRET
+
 $config = @{
     ConnectionStrings = @{
         DefaultConnection = $connection
     }
-    MercadoPago = @{
-        AccessToken      = "APP_USR-your-access-token"
-        PublicKey        = "APP_USR-your-access-token"
-        WebhookSecret    = "0e30ffa5598db11adb333a2ac67416f555d273f301872741de4941f1a7c4176d"
+}
+
+if ($mpAccessToken -and $mpPublicKey -and $mpWebhookSecret) {
+    $config.MercadoPago = @{
+        AccessToken      = $mpAccessToken
+        PublicKey        = $mpPublicKey
+        WebhookSecret    = $mpWebhookSecret
         FrontendBaseUrl  = "http://localhost:5173"
         NotificationUrl  = "http://localhost:5001/api/v1/payments/webhook"
     }
-} | ConvertTo-Json -Depth 4
+}
+else {
+    Write-Host ""
+    Write-Host "Sin MP_ACCESS_TOKEN, MP_PUBLIC_KEY ni MP_WEBHOOK_SECRET en el entorno:" -ForegroundColor Yellow
+    Write-Host "la seccion MercadoPago NO se escribio en appsettings.Local.json." -ForegroundColor Yellow
+    Write-Host "Exportalas antes de correr este script si necesitas pagos en local." -ForegroundColor Yellow
+}
+
+$config = $config | ConvertTo-Json -Depth 4
 
 Set-Content -Path $localConfig -Value $config -Encoding UTF8
 Write-Host ""
