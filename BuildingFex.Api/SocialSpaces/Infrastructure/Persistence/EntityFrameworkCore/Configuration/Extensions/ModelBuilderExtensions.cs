@@ -15,7 +15,7 @@ public static class ModelBuilderExtensions
             entity.HasIndex(s => s.ExternalId).IsUnique();
             entity.Property(s => s.Name).HasMaxLength(200).IsRequired();
             entity.Property(s => s.Description).HasMaxLength(2000);
-            entity.Property(s => s.ImageUrl).HasColumnType("longtext");
+            entity.Property(s => s.ImageUrl).HasColumnType("text");
             entity.HasOne(s => s.OwnerAdmin)
                 .WithMany()
                 .HasForeignKey(s => s.OwnerAdminId)
@@ -35,7 +35,7 @@ public static class ModelBuilderExtensions
             entity.Property(r => r.Date).HasMaxLength(20).IsRequired();
             entity.Property(r => r.StartTime).HasMaxLength(10).IsRequired();
             entity.Property(r => r.EndTime).HasMaxLength(10).IsRequired();
-            entity.Property(r => r.GuestsJson).HasColumnType("longtext");
+            entity.Property(r => r.GuestsJson).HasColumnType("text");
             entity.Property(r => r.GuestInviteToken).HasMaxLength(64);
             entity.HasIndex(r => r.GuestInviteToken);
             entity.HasOne(r => r.OwnerAdmin)

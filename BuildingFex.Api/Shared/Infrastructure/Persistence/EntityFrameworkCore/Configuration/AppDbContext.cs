@@ -40,7 +40,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(s => s.ResidentName).HasMaxLength(256);
             entity.Property(s => s.Topic).HasMaxLength(256);
             entity.Property(s => s.Status).HasMaxLength(32);
-            entity.Property(s => s.MessagesJson).HasColumnType("LONGTEXT");
+            entity.Property(s => s.MessagesJson).HasColumnType("text");
         });
 
         // Import uploads
@@ -53,7 +53,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(u => u.OwnerAdminId).HasMaxLength(128).IsRequired();
             entity.Property(u => u.FileName).HasMaxLength(512);
             entity.Property(u => u.MimeType).HasMaxLength(128);
-            entity.Property(u => u.DataUrl).HasColumnType("LONGTEXT");
+            entity.Property(u => u.DataUrl).HasColumnType("text");
         });
 
         // Team workers
@@ -68,7 +68,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(w => w.Phone).HasMaxLength(64);
             entity.Property(w => w.Dni).HasMaxLength(32);
             entity.Property(w => w.Salary).HasPrecision(18, 2);
-            entity.Property(w => w.PhotoUrl).HasColumnType("LONGTEXT");
+            entity.Property(w => w.PhotoUrl).HasColumnType("text");
         });
 
         builder.UseSnakeCaseNamingConvention();

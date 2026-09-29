@@ -88,7 +88,7 @@ public static class ModelBuilderExtensions
             entity.HasIndex(e => e.ExternalId).IsUnique();
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
             entity.Property(e => e.PurchaseDate).HasMaxLength(20).IsRequired();
-            entity.Property(e => e.InvoicePhotoUrl).HasColumnType("longtext");
+            entity.Property(e => e.InvoicePhotoUrl).HasColumnType("text");
             entity.Property(e => e.Amount).HasPrecision(18, 2);
             entity.HasOne(e => e.OwnerAdmin).WithMany().HasForeignKey(e => e.OwnerAdminId)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -118,8 +118,8 @@ public static class ModelBuilderExtensions
             entity.Property(r => r.Dni).HasMaxLength(80).IsRequired();
             entity.Property(r => r.Phone).HasMaxLength(40).IsRequired();
             entity.Property(r => r.NextPaymentDate).HasMaxLength(20).IsRequired();
-            entity.Property(r => r.PhotoUrl).HasColumnType("longtext");
-            entity.Property(r => r.PaymentHistoryJson).HasColumnType("longtext");
+            entity.Property(r => r.PhotoUrl).HasColumnType("text");
+            entity.Property(r => r.PaymentHistoryJson).HasColumnType("text");
             entity.Property(r => r.CreatedAtIso).HasMaxLength(40);
             entity.Property(r => r.Salary).HasPrecision(18, 2);
             entity.HasOne(r => r.OwnerAdmin).WithMany().HasForeignKey(r => r.OwnerAdminId)
