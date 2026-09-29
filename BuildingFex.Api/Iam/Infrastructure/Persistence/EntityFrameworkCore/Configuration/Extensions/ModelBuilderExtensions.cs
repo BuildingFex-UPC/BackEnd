@@ -9,8 +9,13 @@ public static class ModelBuilderExtensions
 {
     public static void ApplyIamConfiguration(this ModelBuilder builder)
     {
+        // DateOnly.ToDateTime() yields Kind=Unspecified, which PostgreSQL rejects for
+        // timestamptz columns. The column holds a date with no time, so midnight UTC is
+        // the canonical representation and round-trips back to the same DateOnly.
         var dateOnlyConverter = new ValueConverter<DateOnly?, DateTime?>(
-            v => v.HasValue ? v.Value.ToDateTime(TimeOnly.MinValue) : null,
+            v => v.HasValue
+                ? DateTime.SpecifyKind(v.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc)
+                : null,
             v => v.HasValue ? DateOnly.FromDateTime(v.Value) : null);
 
         builder.Entity<User>(entity =>
