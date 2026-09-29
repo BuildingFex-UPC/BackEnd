@@ -37,10 +37,7 @@ public static class CloudHosting
 
     public static void ApplySecretsFromEnvironment(WebApplicationBuilder builder)
     {
-        var secret = FirstEnv(
-            "TokenSettings__Secret",
-            "JWT_SECRET",
-            "TOKEN_SETTINGS_SECRET");
+        var secret = FirstEnv(JwtSecretKeys);
 
         if (!string.IsNullOrWhiteSpace(secret))
             builder.Configuration["TokenSettings:Secret"] = secret;
@@ -79,16 +76,46 @@ public static class CloudHosting
             return;
 
         var secret = configuration["TokenSettings:Secret"];
-        if (string.IsNullOrWhiteSpace(secret) ||
-            secret.Contains("CHANGE-ME", StringComparison.OrdinalIgnoreCase) ||
-            secret.Length < 32)
+        if (!string.IsNullOrWhiteSpace(secret) &&
+            !secret.Contains("CHANGE-ME", StringComparison.OrdinalIgnoreCase) &&
+            secret.Length >= 32)
         {
-            throw new InvalidOperationException(
-                "Missing JWT secret. In your host's environment variables, add TokenSettings__Secret " +
-                "(or JWT_SECRET) with a random string of at least 32 characters, then redeploy. " +
-                "You can generate one with: openssl rand -base64 48");
+            return;
         }
+
+        var reason = string.IsNullOrWhiteSpace(secret)
+            ? "no secret was found"
+            : secret.Contains("CHANGE-ME", StringComparison.OrdinalIgnoreCase)
+                ? "the value is the appsettings.json placeholder (the real secret was not set)"
+                : $"the value is only {secret.Length} characters long, and it needs at least 32";
+
+        throw new InvalidOperationException(
+            $"Missing JWT secret for production: {reason}. {DescribeSecretSources()} " +
+            "Set TokenSettings__Secret (or JWT_SECRET) in your host's environment variables to a " +
+            "random string of at least 32 characters, then redeploy. " +
+            "Generate one with: openssl rand -base64 48");
     }
+
+    private static string DescribeSecretSources()
+    {
+        var found = JwtSecretKeys
+            .Select(key =>
+            {
+                var value = Environment.GetEnvironmentVariable(key);
+                return string.IsNullOrWhiteSpace(value)
+                    ? $"{key}=not set"
+                    : $"{key}=set ({value.Length} chars)";
+            });
+
+        return $"Environment: {string.Join(", ", found)}.";
+    }
+
+    private static readonly string[] JwtSecretKeys =
+    [
+        "TokenSettings__Secret",
+        "JWT_SECRET",
+        "TOKEN_SETTINGS_SECRET",
+    ];
 
     public static bool IsPlatformDeployment() =>
         !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT")) ||
