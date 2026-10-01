@@ -39,10 +39,10 @@ Cada módulo de negocio sigue las mismas 4 capas:
 | `Finances` | Pagos, cuotas, recibos, KPI financiero | 🟢 Fase 4 lista |
 | `Incidents` | Incidencias de residentes | 🟢 Fase 3 lista |
 | `SocialSpaces` | Espacios comunes y reservas | 🟢 Fase 5 lista |
-| `Information` | Comunicados / anuncios | ⚪ Por implementar |
-| `Support` | Chat de soporte | ⚪ Por implementar |
-| `Team` | Trabajadores del edificio | ⚪ Por implementar |
-| `Import` | Carga masiva de datos | ⚪ Por implementar |
+| `Information` | Comunicados / anuncios | 🟢 Fase lista (4 capas + seeding) |
+| `Support` | Chat de soporte | 🟡 CRUD básico (compat) |
+| `Team` | Trabajadores del edificio | 🟡 CRUD básico (compat) |
+| `Import` | Carga masiva de datos | 🟡 CRUD básico (compat) |
 | `Shared` | DbContext, repositorio base, Result, middleware | 🟢 Base lista |
 
 ## Cómo trabaja el equipo
@@ -71,6 +71,15 @@ La variable crítica es `ConnectionStrings__DefaultConnection`, en formato `Host
 ### Variables de entorno
 
 `deploy.env.example` documenta todas las variables con su formato esperado. Ningún secreto real debe subirse al repositorio.
+
+Si `MercadoPago__AccessToken` no está definido, los endpoints de Mercado Pago operan en **modo demo**: simulan el pago y marcan los recibos como pagados sin llamar a la API de Mercado Pago.
+
+## Repositorios
+
+| Repositorio | Contenido |
+|-------------|-----------|
+| [`BuildingFex-UPC/BackEnd`](https://github.com/BuildingFex-UPC/BackEnd) | Esta API (pública) |
+| [`BuildingFex-UPC/FrontEnd`](https://github.com/BuildingFex-UPC/FrontEnd) | App móvil Kotlin + Jetpack Compose (pública) |
 
 ## Requisitos
 
@@ -147,9 +156,11 @@ El frontend hoy llama rutas planas (`/users`, `/incidents`). Los controllers de 
 1. **Iam** — login real, JWT, registro admin ✅
 2. **Residents** — CRUD residentes con `ownerAdminId` ✅
 3. **Incidents** — primer módulo de negocio completo ✅
-4. **Finances** — pagos y cuotas
-5. **SocialSpaces** — espacios y reservas
-6. Resto de módulos
+4. **Finances** — pagos, recibos y cuotas ✅
+5. **SocialSpaces** — espacios y reservas ✅
+6. **Information** — comunicados y anuncios ✅
+7. **Support / Team / Import** — CRUD básico 🟡
+8. **Profiles** — pendiente (opcional) ⚪
 
 ## Multi-tenancy
 
