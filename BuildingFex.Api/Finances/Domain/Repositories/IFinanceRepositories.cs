@@ -25,6 +25,7 @@ public interface IReceiptRepository
     Task<IEnumerable<Receipt>> ListAsync(string? ownerAdminExternalId, string? residentExternalId, CancellationToken cancellationToken = default);
     Task AddAsync(Receipt entity, CancellationToken cancellationToken = default);
     void Update(Receipt entity);
+    void Remove(Receipt entity);
     Task<bool> AnyAsync(CancellationToken cancellationToken = default);
 }
 

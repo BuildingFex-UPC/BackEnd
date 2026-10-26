@@ -84,4 +84,16 @@ public class ReceiptsCompatController(
         var updated = await receiptRepository.FindByExternalIdAsync(id, ct);
         return Ok(FinanceCompatSerializer.ReceiptToJson(updated!));
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id, CancellationToken ct)
+    {
+        var receipt = await receiptRepository.FindByExternalIdAsync(id, ct);
+        if (receipt is null)
+            return NotFound(new { code = "RECEIPT_NOT_FOUND", message = "Recibo no encontrado." });
+
+        receiptRepository.Remove(receipt);
+        await unitOfWork.CompleteAsync(ct);
+        return NoContent();
+    }
 }
