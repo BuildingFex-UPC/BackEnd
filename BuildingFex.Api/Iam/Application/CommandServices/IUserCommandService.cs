@@ -10,5 +10,6 @@ public interface IUserCommandService
     Task<Result<(User user, string token)>> Handle(RegisterAdminCommand command, CancellationToken cancellationToken = default);
     Task<Result<User>> Handle(CreateResidentCommand command, CancellationToken cancellationToken = default);
     Task<Result<User>> Handle(UpdateResidentCredentialsCommand command, CancellationToken cancellationToken = default);
+    Task<Result<User>> Handle(UpdateResidentProfileCommand command, CancellationToken cancellationToken = default);
     Task<Result<User>> Handle(DeleteResidentCommand command, CancellationToken cancellationToken = default);
 }

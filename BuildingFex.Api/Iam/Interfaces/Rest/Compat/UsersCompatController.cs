@@ -102,6 +102,31 @@ public class UsersCompatController(
         return Ok(UserResourceAssembler.ToResource(result.Value!));
     }
 
+    /// <summary>
+    /// Actualiza los datos editables del perfil (nombre, DNI, dirección, piso).
+    /// El correo y el código de departamento no son editables desde aquí.
+    /// </summary>
+    [HttpPatch("{id}/profile")]
+    public async Task<IActionResult> PatchProfile(
+        string id,
+        [FromBody] UpdateResidentProfileResource resource,
+        CancellationToken ct)
+    {
+        var result = await userCommandService.Handle(
+            new UpdateResidentProfileCommand(
+                id,
+                resource.Name ?? string.Empty,
+                resource.Dni,
+                resource.Address,
+                resource.Floor),
+            ct);
+
+        if (result.IsFailure)
+            return BadRequest(new { code = MapErrorCode(result.Error), message = result.Message });
+
+        return Ok(UserResourceAssembler.ToResource(result.Value!));
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {

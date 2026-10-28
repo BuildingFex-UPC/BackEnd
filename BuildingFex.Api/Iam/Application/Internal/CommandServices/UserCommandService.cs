@@ -152,6 +152,29 @@ public class UserCommandService(
     }
 
     public async Task<Result<User>> Handle(
+        UpdateResidentProfileCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await userRepository.FindByExternalIdAsync(command.ExternalId, cancellationToken);
+        if (user is null || user.Role != "resident")
+            return Result<User>.Failure(
+                IamError.ResidentNotFound,
+                "Residente no encontrado.");
+
+        if (string.IsNullOrWhiteSpace(command.Name))
+            return Result<User>.Failure(
+                IamError.ResidentFieldsRequired,
+                "El nombre es obligatorio.");
+
+        user.UpdateProfile(command.Name, command.Dni, command.Address, command.Floor);
+        userRepository.Update(user);
+        await unitOfWork.CompleteAsync(cancellationToken);
+
+        var updated = await userRepository.FindByExternalIdAsync(command.ExternalId, cancellationToken);
+        return Result<User>.Success(updated!);
+    }
+
+    public async Task<Result<User>> Handle(
         DeleteResidentCommand command,
         CancellationToken cancellationToken = default)
     {

@@ -48,6 +48,8 @@ public record CreateUserCompatResource(
 
 public record UpdateResidentCredentialsResource(string? Email, string? Password);
 
+public record UpdateResidentProfileResource(string? Name, string? Dni, string? Address, string? Floor);
+
 public record SetResidentCredentialsByCodeResource(string Code, string Email, string Password);
 
 public record SubscriptionResponseResource(

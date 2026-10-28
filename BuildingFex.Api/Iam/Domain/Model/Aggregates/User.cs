@@ -109,6 +109,25 @@ public class User : IAuditableEntity
         PasswordHash = passwordHash;
     }
 
+    /// <summary>
+    /// Actualiza los datos editables del perfil de un residente. El correo y el
+    /// código (departamento) quedan fuera a propósito: el correo es el identificador
+    /// de login y el código lo asigna el administrador.
+    /// </summary>
+    public void UpdateProfile(string name, string? dni, string? address, string? floor)
+    {
+        if (Role != "resident")
+            throw new InvalidOperationException("Only residents can update their profile.");
+
+        Name = name.Trim();
+        Dni = Normalize(dni);
+        Address = Normalize(address);
+        Floor = Normalize(floor);
+    }
+
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     public void UpdateSubscription(string planId, DateTimeOffset? paidUntil = null)
     {
         if (Role != "admin")
