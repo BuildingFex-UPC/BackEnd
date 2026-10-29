@@ -3,7 +3,8 @@ namespace BuildingFex.Api.Iam.Domain.Model.Commands;
 /// <summary>
 /// Actualiza los datos editables del perfil (residente o admin). El correo sí
 /// se incluye (el usuario puede cambiar su login) pero se valida unicidad en
-/// el servicio; el código de departamento queda fuera porque lo asigna el admin.
+/// el servicio. Los residentes también pueden cambiar su departamento: en ese
+/// caso Floor y Code viajan juntos (el código conserva el sufijo de invitación).
 /// </summary>
 public record UpdateResidentProfileCommand(
     string ExternalId,
@@ -14,4 +15,5 @@ public record UpdateResidentProfileCommand(
     string? Email = null,
     string? Avatar = null,
     string? Company = null,
-    string? Ruc = null);
+    string? Ruc = null,
+    string? Code = null);

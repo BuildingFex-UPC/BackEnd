@@ -109,8 +109,10 @@ public class User : IAuditableEntity
 
     public void UpdateCredentials(string email, string passwordHash)
     {
-        if (Role != "resident")
-            throw new InvalidOperationException("Only residents can update credentials.");
+        // Residents and admins can update their own login (email / password);
+        // only the IAM flows that mint credentials reach this method.
+        if (Role is not ("resident" or "admin"))
+            throw new InvalidOperationException("Only residents and admins can update credentials.");
 
         Email = email.Trim().ToLowerInvariant();
         PasswordHash = passwordHash;
@@ -119,9 +121,9 @@ public class User : IAuditableEntity
     /// <summary>
     /// Actualiza los datos editables del perfil: nombre, DNI, dirección,
     /// correo de acceso e icono de perfil. Los residentes también actualizan
-    /// piso; los admins, empresa y RUC. El correo sí es editable aquí
-    /// (validando unicidad en el servicio) porque es el identificador de
-    /// login; el código de departamento lo asigna el admin.
+    /// departamento (floor + code juntos); los admins, empresa y RUC. El
+    /// correo sí es editable aquí (validando unicidad en el servicio) porque
+    /// es el identificador de login.
     /// </summary>
     public void UpdateProfile(
         string name,
@@ -131,7 +133,8 @@ public class User : IAuditableEntity
         string? email = null,
         string? avatar = null,
         string? company = null,
-        string? ruc = null)
+        string? ruc = null,
+        string? code = null)
     {
         Name = name.Trim();
         Dni = Normalize(dni);
@@ -139,6 +142,11 @@ public class User : IAuditableEntity
         Floor = Normalize(floor);
         Company = Normalize(company);
         Ruc = Normalize(ruc);
+
+        // The department code is only touched when the caller supplies one
+        // (residents editing their apartment); null keeps the existing code.
+        if (code is not null)
+            Code = Normalize(code);
 
         if (email is not null)
             Email = email.Trim().ToLowerInvariant();

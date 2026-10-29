@@ -57,7 +57,8 @@ public record UpdateResidentProfileResource(
     string? Email = null,
     string? Avatar = null,
     string? Company = null,
-    string? Ruc = null);
+    string? Ruc = null,
+    string? Code = null);
 
 public record SetResidentCredentialsByCodeResource(string Code, string Email, string Password);
 

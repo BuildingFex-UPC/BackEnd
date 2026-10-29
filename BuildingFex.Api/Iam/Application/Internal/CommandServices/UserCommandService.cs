@@ -133,10 +133,10 @@ public class UserCommandService(
         CancellationToken cancellationToken = default)
     {
         var user = await userRepository.FindByExternalIdAsync(command.ExternalId, cancellationToken);
-        if (user is null || user.Role != "resident")
+        if (user is null || (user.Role != "resident" && user.Role != "admin"))
             return Result<User>.Failure(
                 IamError.ResidentNotFound,
-                "Residente no encontrado.");
+                "Usuario no encontrado.");
 
         if (string.IsNullOrWhiteSpace(command.Email) || string.IsNullOrWhiteSpace(command.Password))
             return Result<User>.Failure(
@@ -196,7 +196,25 @@ public class UserCommandService(
         if (avatar is { Length: > MaxAvatarLength })
             return Result<User>.Failure(
                 IamError.ResidentFieldsRequired,
-                "La imagen de perfil es demasiado grande.");
+                "La imagen de perfil es demasiada grande.");
+
+        // Residents may edit their department: the code travels together with
+        // the floor and must stay unique among the owner's residents.
+        string? code = null;
+        if (!string.IsNullOrWhiteSpace(command.Code))
+        {
+            code = command.Code.Trim();
+            var codeOwner = (await userRepository.SearchAsync(
+                    role: "resident",
+                    code: code,
+                    ownerAdminId: user.OwnerAdminId,
+                    cancellationToken: cancellationToken))
+                .FirstOrDefault(u => u.ExternalId != user.ExternalId);
+            if (codeOwner is not null)
+                return Result<User>.Failure(
+                    IamError.ResidentCodeAlreadyExists,
+                    "Ese departamento ya tiene un residente asignado.");
+        }
 
         user.UpdateProfile(
             command.Name,
@@ -206,7 +224,8 @@ public class UserCommandService(
             email,
             avatar,
             command.Company,
-            command.Ruc);
+            command.Ruc,
+            code);
         userRepository.Update(user);
         await unitOfWork.CompleteAsync(cancellationToken);
 
