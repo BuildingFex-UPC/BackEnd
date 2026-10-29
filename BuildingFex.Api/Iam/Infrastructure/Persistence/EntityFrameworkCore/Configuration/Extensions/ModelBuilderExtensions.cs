@@ -33,6 +33,8 @@ public static class ModelBuilderExtensions
             entity.Property(u => u.Ruc).HasMaxLength(20);
             entity.Property(u => u.Floor).HasMaxLength(10);
             entity.Property(u => u.Code).HasMaxLength(20);
+            // Profile icon: preset string or a compressed base64 photo data URL.
+            entity.Property(u => u.Avatar).HasColumnType("text");
             entity.Property(u => u.AdmissionDate).HasConversion(dateOnlyConverter);
             entity.Property(u => u.SubscriptionPlanId).HasMaxLength(20).HasDefaultValue(SubscriptionPlanIds.Free);
             entity.Property(u => u.SubscriptionPaidUntil);

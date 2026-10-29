@@ -15,6 +15,12 @@ public class UserCommandService(
     IHashingService hashingService,
     IUnitOfWork unitOfWork) : IUserCommandService
 {
+    /// <summary>
+    /// Cap for the profile avatar (a preset string or a compressed base64
+    /// photo). ~600 KB of base64 ≈ 450 KB of JPEG, plenty for a 512px avatar.
+    /// </summary>
+    private const int MaxAvatarLength = 600_000;
+
     public async Task<Result<(User user, string token)>> Handle(
         SignInCommand command,
         CancellationToken cancellationToken = default)
@@ -166,13 +172,45 @@ public class UserCommandService(
                 IamError.ResidentFieldsRequired,
                 "El nombre es obligatorio.");
 
-        user.UpdateProfile(command.Name, command.Dni, command.Address, command.Floor);
+        // Email is optional, but when supplied it must be well-formed and unique
+        // because it is the sign-in identifier.
+        string? email = null;
+        if (!string.IsNullOrWhiteSpace(command.Email))
+        {
+            email = command.Email.Trim().ToLowerInvariant();
+            if (!IsValidEmail(email))
+                return Result<User>.Failure(
+                    IamError.InvalidEmail,
+                    "El correo no tiene un formato válido.");
+
+            var emailOwner = await userRepository.FindByEmailAsync(email, cancellationToken);
+            if (emailOwner is not null && emailOwner.ExternalId != user.ExternalId)
+                return Result<User>.Failure(
+                    IamError.EmailAlreadyExists,
+                    "El email ya está registrado.");
+        }
+
+        // Avatar is a preset string or a small base64 photo; cap it so a huge
+        // payload can't bloat the users table.
+        var avatar = command.Avatar?.Trim();
+        if (avatar is { Length: > MaxAvatarLength })
+            return Result<User>.Failure(
+                IamError.ResidentFieldsRequired,
+                "La imagen de perfil es demasiado grande.");
+
+        user.UpdateProfile(command.Name, command.Dni, command.Address, command.Floor, email, avatar);
         userRepository.Update(user);
         await unitOfWork.CompleteAsync(cancellationToken);
 
         var updated = await userRepository.FindByExternalIdAsync(command.ExternalId, cancellationToken);
         return Result<User>.Success(updated!);
     }
+
+    /// <summary>Basic RFC 5322-ish check: local@domain.tld with no spaces.</summary>
+    private static bool IsValidEmail(string email) =>
+        System.Text.RegularExpressions.Regex.IsMatch(
+            email,
+            @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
 
     public async Task<Result<User>> Handle(
         DeleteResidentCommand command,

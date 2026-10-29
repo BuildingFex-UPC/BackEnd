@@ -34,6 +34,13 @@ public class User : IAuditableEntity
     public string? Code { get; private set; }
     public DateOnly? AdmissionDate { get; private set; }
 
+    /// <summary>
+    /// Profile icon shown in the app drawer. Two shapes are accepted:
+    /// a preset ("preset|😀|#FF5722") or an uploaded photo as a data URL
+    /// ("data:image/jpeg;base64,..."). Null = default person icon.
+    /// </summary>
+    public string? Avatar { get; private set; }
+
     /// <summary>Multi-tenancy: residente pertenece a este admin (FK interna).</summary>
     public int? OwnerAdminId { get; private set; }
 
@@ -110,11 +117,18 @@ public class User : IAuditableEntity
     }
 
     /// <summary>
-    /// Actualiza los datos editables del perfil de un residente. El correo y el
-    /// código (departamento) quedan fuera a propósito: el correo es el identificador
-    /// de login y el código lo asigna el administrador.
+    /// Actualiza los datos editables del perfil de un residente: nombre, DNI,
+    /// dirección, piso, correo de acceso e icono de perfil. El correo sí es
+    /// editable aquí (validando unicidad en el servicio) porque es el
+    /// identificador de login; el código de departamento lo asigna el admin.
     /// </summary>
-    public void UpdateProfile(string name, string? dni, string? address, string? floor)
+    public void UpdateProfile(
+        string name,
+        string? dni,
+        string? address,
+        string? floor,
+        string? email = null,
+        string? avatar = null)
     {
         if (Role != "resident")
             throw new InvalidOperationException("Only residents can update their profile.");
@@ -123,6 +137,12 @@ public class User : IAuditableEntity
         Dni = Normalize(dni);
         Address = Normalize(address);
         Floor = Normalize(floor);
+
+        if (email is not null)
+            Email = email.Trim().ToLowerInvariant();
+
+        // Avatar may be intentionally cleared, so only trim (keep null as null).
+        Avatar = avatar is null ? null : avatar.Trim();
     }
 
     private static string? Normalize(string? value) =>

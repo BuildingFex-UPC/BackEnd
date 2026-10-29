@@ -27,5 +27,6 @@ public static class UserResourceAssembler
             user.Role == "admin" && user.SubscriptionPaidUntil.HasValue
                 ? user.SubscriptionPaidUntil.Value.ToString("o")
                 : null,
-            user.Role == "admin" ? SubscriptionPlans.MaxResidents(user.SubscriptionPlanId) : null);
+            user.Role == "admin" ? SubscriptionPlans.MaxResidents(user.SubscriptionPlanId) : null,
+            user.Avatar);
 }

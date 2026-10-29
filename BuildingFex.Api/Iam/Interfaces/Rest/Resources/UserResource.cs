@@ -16,7 +16,8 @@ public record UserResource(
     bool? HasCredentials = null,
     string? SubscriptionPlanId = null,
     string? SubscriptionPaidUntil = null,
-    int? ResidentLimit = null);
+    int? ResidentLimit = null,
+    string? Avatar = null);
 
 public record AuthenticatedUserResource(UserResource User, string Token);
 
@@ -48,7 +49,13 @@ public record CreateUserCompatResource(
 
 public record UpdateResidentCredentialsResource(string? Email, string? Password);
 
-public record UpdateResidentProfileResource(string? Name, string? Dni, string? Address, string? Floor);
+public record UpdateResidentProfileResource(
+    string? Name,
+    string? Dni,
+    string? Address,
+    string? Floor,
+    string? Email = null,
+    string? Avatar = null);
 
 public record SetResidentCredentialsByCodeResource(string Code, string Email, string Password);
 

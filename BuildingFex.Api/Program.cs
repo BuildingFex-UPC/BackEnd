@@ -4,6 +4,7 @@ using BuildingFex.Api.Iam.Application.Internal.CommandServices;
 using BuildingFex.Api.Iam.Application.Internal.OutboundServices;
 using BuildingFex.Api.Iam.Application.Internal.QueryServices;
 using BuildingFex.Api.Iam.Application.QueryServices;
+using BuildingFex.Api.Iam.Domain.Model.Aggregates;
 using BuildingFex.Api.Iam.Domain.Repositories;
 using BuildingFex.Api.Iam.Infrastructure.Hashing.BCrypt.Services;
 using BuildingFex.Api.Iam.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
@@ -177,6 +178,31 @@ using (var scope = app.Services.CreateScope())
     
     // EnsureCreated crea el esquema desde el modelo cuando la base esta vacia.
     context.Database.EnsureCreated();
+
+    // EnsureCreated NO agrega columnas a una base ya existente, así que el
+    // campo avatar (añadido después del primer despliegue) se agrega aquí de
+    // forma idempotente. Los nombres se toman del modelo EF (convención
+    // snake_case), no se escriben a mano. Si la columna ya existe no hace nada.
+    try
+    {
+        var userEntity = context.Model.FindEntityType(typeof(User));
+        var tableName = userEntity?.GetTableName();
+        if (userEntity is not null && !string.IsNullOrEmpty(tableName))
+        {
+            var schema = userEntity.GetSchema();
+            var quotedTable = string.IsNullOrEmpty(schema)
+                ? $"\"{tableName}\""
+                : $"\"{schema}\".\"{tableName}\"";
+            context.Database.ExecuteSqlRaw(
+                $"ALTER TABLE {quotedTable} ADD COLUMN IF NOT EXISTS \"avatar\" text");
+        }
+    }
+    catch (Exception ex)
+    {
+        // Non-fatal: if the column is already there or the DB user can't alter,
+        // log and keep booting (the profile endpoint simply won't persist avatar).
+        Console.WriteLine($"[startup] no se pudo asegurar la columna avatar: {ex.Message}");
+    }
 
     var seedPath = builder.Configuration["Seed:DbJsonPath"];
     if (!string.IsNullOrWhiteSpace(seedPath))

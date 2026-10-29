@@ -103,8 +103,9 @@ public class UsersCompatController(
     }
 
     /// <summary>
-    /// Actualiza los datos editables del perfil (nombre, DNI, dirección, piso).
-    /// El correo y el código de departamento no son editables desde aquí.
+    /// Actualiza los datos editables del perfil (nombre, DNI, dirección, piso,
+    /// correo de acceso e icono de perfil). El código de departamento no es
+    /// editable porque lo asigna el administrador.
     /// </summary>
     [HttpPatch("{id}/profile")]
     public async Task<IActionResult> PatchProfile(
@@ -118,7 +119,9 @@ public class UsersCompatController(
                 resource.Name ?? string.Empty,
                 resource.Dni,
                 resource.Address,
-                resource.Floor),
+                resource.Floor,
+                resource.Email,
+                resource.Avatar),
             ct);
 
         if (result.IsFailure)
@@ -146,6 +149,7 @@ public class UsersCompatController(
             IamError.ResidentNotFound => "RESIDENT_NOT_FOUND",
             IamError.ResidentPlanLimitReached => "RESIDENT_PLAN_LIMIT_REACHED",
             IamError.EmailAlreadyExists => "EMAIL_ALREADY_EXISTS",
+            IamError.InvalidEmail => "INVALID_EMAIL",
             _ => "USER_ERROR",
         };
 }

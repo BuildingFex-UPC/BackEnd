@@ -12,4 +12,5 @@ public enum IamError
     ResidentOwnerRequired,
     ResidentNotFound,
     ResidentPlanLimitReached,
+    InvalidEmail,
 }
