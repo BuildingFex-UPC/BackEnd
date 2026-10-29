@@ -117,26 +117,28 @@ public class User : IAuditableEntity
     }
 
     /// <summary>
-    /// Actualiza los datos editables del perfil de un residente: nombre, DNI,
-    /// dirección, piso, correo de acceso e icono de perfil. El correo sí es
-    /// editable aquí (validando unicidad en el servicio) porque es el
-    /// identificador de login; el código de departamento lo asigna el admin.
+    /// Actualiza los datos editables del perfil: nombre, DNI, dirección,
+    /// correo de acceso e icono de perfil. Los residentes también actualizan
+    /// piso; los admins, empresa y RUC. El correo sí es editable aquí
+    /// (validando unicidad en el servicio) porque es el identificador de
+    /// login; el código de departamento lo asigna el admin.
     /// </summary>
     public void UpdateProfile(
         string name,
         string? dni,
         string? address,
-        string? floor,
+        string? floor = null,
         string? email = null,
-        string? avatar = null)
+        string? avatar = null,
+        string? company = null,
+        string? ruc = null)
     {
-        if (Role != "resident")
-            throw new InvalidOperationException("Only residents can update their profile.");
-
         Name = name.Trim();
         Dni = Normalize(dni);
         Address = Normalize(address);
         Floor = Normalize(floor);
+        Company = Normalize(company);
+        Ruc = Normalize(ruc);
 
         if (email is not null)
             Email = email.Trim().ToLowerInvariant();

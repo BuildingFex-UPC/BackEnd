@@ -103,9 +103,9 @@ public class UsersCompatController(
     }
 
     /// <summary>
-    /// Actualiza los datos editables del perfil (nombre, DNI, dirección, piso,
-    /// correo de acceso e icono de perfil). El código de departamento no es
-    /// editable porque lo asigna el administrador.
+    /// Actualiza los datos editables del perfil (nombre, DNI, dirección,
+    /// piso, correo de acceso, icono de perfil y, para admins, empresa/RUC).
+    /// El código de departamento no es editable porque lo asigna el admin.
     /// </summary>
     [HttpPatch("{id}/profile")]
     public async Task<IActionResult> PatchProfile(
@@ -121,7 +121,9 @@ public class UsersCompatController(
                 resource.Address,
                 resource.Floor,
                 resource.Email,
-                resource.Avatar),
+                resource.Avatar,
+                resource.Company,
+                resource.Ruc),
             ct);
 
         if (result.IsFailure)

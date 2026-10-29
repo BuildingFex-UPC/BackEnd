@@ -162,10 +162,10 @@ public class UserCommandService(
         CancellationToken cancellationToken = default)
     {
         var user = await userRepository.FindByExternalIdAsync(command.ExternalId, cancellationToken);
-        if (user is null || user.Role != "resident")
+        if (user is null || (user.Role != "resident" && user.Role != "admin"))
             return Result<User>.Failure(
                 IamError.ResidentNotFound,
-                "Residente no encontrado.");
+                "Usuario no encontrado.");
 
         if (string.IsNullOrWhiteSpace(command.Name))
             return Result<User>.Failure(
@@ -190,15 +190,23 @@ public class UserCommandService(
                     "El email ya está registrado.");
         }
 
-        // Avatar is a preset string or a small base64 photo; cap it so a huge
-        // payload can't bloat the users table.
+        // Avatar is a small base64 photo; cap it so a huge payload can't
+        // bloat the users table.
         var avatar = command.Avatar?.Trim();
         if (avatar is { Length: > MaxAvatarLength })
             return Result<User>.Failure(
                 IamError.ResidentFieldsRequired,
                 "La imagen de perfil es demasiado grande.");
 
-        user.UpdateProfile(command.Name, command.Dni, command.Address, command.Floor, email, avatar);
+        user.UpdateProfile(
+            command.Name,
+            command.Dni,
+            command.Address,
+            command.Floor,
+            email,
+            avatar,
+            command.Company,
+            command.Ruc);
         userRepository.Update(user);
         await unitOfWork.CompleteAsync(cancellationToken);
 
