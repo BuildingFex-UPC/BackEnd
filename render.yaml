@@ -2,7 +2,8 @@
 #
 # Este archivo declara el stack existente para que Render lo gestione solo:
 #   - El web service BackEnd-1 (Docker).
-#   - La base de datos PostgreSQL buildingfexdb.
+#   - La base de datos PostgreSQL "BuildingFexDB" (display name; internamente
+#     la base se llama buildingfexdb y el usuario buildingfexdb_user).
 #   - DATABASE_URL se inyecta SOLO desde la BD vía `fromDatabase`, por lo
 #     que NO se guarda ningún secreto de BD en este repo (es público).
 #
@@ -42,7 +43,7 @@ services:
       # (CloudHosting.ResolveConnectionString -> DATABASE_URL).
       - key: DATABASE_URL
         fromDatabase:
-          name: buildingfexdb          # debe coincidir con databases[].name
+          name: BuildingFexDB          # debe coincidir con databases[].name
           property: connectionString
 
       # MercadoPago: secretos/configuración fuera del repo.
@@ -67,7 +68,9 @@ services:
         sync: false
 
 databases:
-  - name: buildingfexdb      # nombre EXACTO del recurso BD existente (lo adopta)
+  - name: BuildingFexDB      # display name EXACTO de la BD existente (lo adopta).
+                             # Verificado por API (/v1/postgres). OJO: es
+                             # distinto de `databaseName` (buildingfexdb).
     databaseName: buildingfexdb
     user: buildingfexdb_user
     plan: free
