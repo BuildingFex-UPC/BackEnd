@@ -1,33 +1,51 @@
-# Render Blueprint para BuildingFex API.
+# Render Blueprint para BuildingFex API (infraestructura como código).
 #
-# Uso: New → Blueprint en Render, apuntando a este repositorio.
-# Después completá las variables marcadas con `sync: false` desde el panel.
+# Este archivo declara el stack existente para que Render lo gestione solo:
+#   - El web service BackEnd-1 (Docker).
+#   - La base de datos PostgreSQL buildingfexdb.
+#   - DATABASE_URL se inyecta SOLO desde la BD vía `fromDatabase`, por lo
+#     que NO se guarda ningún secreto de BD en este repo (es público).
 #
-# La base de datos es PostgreSQL de Render (el API usa Npgsql).
-# Formato: Host=X;Port=5432;Database=D;Username=U;Password=P
+# CÓMO ADOPTAR LOS RECURSOS EXISTENTES (importante):
+#   El servicio y la BD ya fueron creados a mano en el dashboard. Al crear el
+#   Blueprint, Render empareja por NOMBRE: si el nombre coincide con un
+#   recurso existente lo ADOPTA; si no, crea uno NUEVO (p. ej. una segunda
+#   BD vacía). Por eso los nombres de abajo coinciden con los reales.
+#   Revisá SIEMPRE la preview de "New -> Blueprint" antes de confirmar:
+#   si propone crear recursos nuevos en vez de adoptar los existentes, no
+#   confirmes y ajustá el `name` al recurso real del dashboard.
+#
+# Variables marcadas `sync: false` se completan desde el panel (no van al repo).
 
 services:
   - type: web
-    name: buildingfex-api
+    name: BackEnd-1          # nombre EXACTO del servicio existente (lo adopta)
     runtime: docker
-    plan: starter
+    plan: free
+    region: oregon
+    branch: main
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /health
-    autoDeploy: true
+    healthCheckPath: /health  # verificado: responde 200 {"status":"ok"}
+    autoDeployTrigger: commit
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
 
-      # Render genera un string aleatorio por ti. También podés pegarlo a mano
-      # con: openssl rand -base64 48
+      # Secreto JWT: el valor YA existe en el panel y se conserva (no se
+      # regenera, para no invalidar los tokens vigentes). No va al repo.
       - key: TokenSettings__Secret
-        generateValue: true
-
-      # Host/Port/Database/Username/Password del Postgres de Render.
-      - key: ConnectionStrings__DefaultConnection
         sync: false
 
+      # Render inyecta el connection string (postgresql://...) de la BD
+      # declarada en `databases` de abajo. El código lo lee primero
+      # (CloudHosting.ResolveConnectionString -> DATABASE_URL).
+      - key: DATABASE_URL
+        fromDatabase:
+          name: buildingfexdb          # debe coincidir con databases[].name
+          property: connectionString
+
+      # MercadoPago: secretos/configuración fuera del repo.
       - key: MercadoPago__AccessToken
         sync: false
       - key: MercadoPago__PublicKey
@@ -39,11 +57,18 @@ services:
       - key: MercadoPago__FrontendBaseUrl
         sync: false
 
-      # Debe apuntar a Render, NO a Railway:
-      # https://buildingfex-api.onrender.com/api/v1/payments/webhook
+      # Webhook de pagos de este servicio:
+      # https://backend-1-lgr7.onrender.com/api/v1/payments/webhook
       - key: MercadoPago__NotificationUrl
         sync: false
 
       # Origenes permitidos por CORS. Sin esto, cualquier origen es aceptado.
       - key: Cors__AllowedOrigins
         sync: false
+
+databases:
+  - name: buildingfexdb      # nombre EXACTO del recurso BD existente (lo adopta)
+    databaseName: buildingfexdb
+    user: buildingfexdb_user
+    plan: free
+    region: oregon
