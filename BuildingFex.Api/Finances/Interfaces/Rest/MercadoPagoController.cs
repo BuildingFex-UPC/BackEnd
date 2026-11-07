@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using System.Text.Json;
 using BuildingFex.Api.Finances.Application.Internal.MercadoPago;
+using BuildingFex.Api.Iam.Domain.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -11,6 +13,7 @@ namespace BuildingFex.Api.Finances.Interfaces.Rest;
 [Tags("Mercado Pago")]
 public class MercadoPagoController(
     IMercadoPagoService mercadoPagoService,
+    IUserRepository userRepository,
     IOptions<MercadoPagoSettings> mpSettings,
     ILogger<MercadoPagoController> logger) : ControllerBase
 {
@@ -23,14 +26,20 @@ public class MercadoPagoController(
         var configured = !string.IsNullOrWhiteSpace(_settings.AccessToken) &&
                          !_settings.AccessToken.Contains("YOUR_", StringComparison.OrdinalIgnoreCase);
 
+        var isSandbox = _settings.UseSandbox ||
+                        (!string.IsNullOrWhiteSpace(_settings.AccessToken) &&
+                         _settings.AccessToken.StartsWith("TEST-", StringComparison.OrdinalIgnoreCase));
+
         return Ok(new
         {
             publicKey = string.IsNullOrWhiteSpace(_settings.PublicKey) ? null : _settings.PublicKey,
             configured,
+            isSandbox,
             country = "PE",
             currency = "PEN",
         });
     }
+
     [HttpPost("preference")]
     [Authorize]
     public async Task<IActionResult> CreatePreference(
@@ -76,17 +85,51 @@ public class MercadoPagoController(
     public async Task<IActionResult> CreateMaintenanceCheckout(
         [FromBody] JsonElement body, CancellationToken ct)
     {
-        if (!body.TryGetProperty("residentId", out var residentProp))
-            return BadRequest(new { code = "RESIDENT_ID_REQUIRED", message = "residentId is required." });
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (string.IsNullOrWhiteSpace(currentUserId))
+            return Unauthorized(new { code = "UNAUTHORIZED", message = "Token de autenticación inválido." });
 
-        var residentId = residentProp.GetString() ?? string.Empty;
-        var ownerAdminId = body.TryGetProperty("ownerAdminId", out var ownerProp)
-            ? ownerProp.GetString() ?? string.Empty
-            : string.Empty;
+        var currentUser = await userRepository.FindByExternalIdAsync(currentUserId, ct);
+        if (currentUser is null)
+            return Unauthorized(new { code = "USER_NOT_FOUND", message = "Usuario autenticado no encontrado." });
+
+        string residentId;
+        string ownerAdminId;
+
+        if (currentUser.Role == "resident")
+        {
+            if (body.TryGetProperty("residentId", out var bodyResidentProp))
+            {
+                var bodyResident = bodyResidentProp.GetString();
+                if (!string.IsNullOrWhiteSpace(bodyResident) &&
+                    !string.Equals(bodyResident, currentUser.ExternalId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        code = "FORBIDDEN_RESIDENT_MISMATCH",
+                        message = "No puede iniciar un checkout para otro residente."
+                    });
+                }
+            }
+
+            residentId = currentUser.ExternalId;
+            ownerAdminId = currentUser.OwnerAdmin?.ExternalId
+                ?? User.FindFirstValue("ownerAdminId")
+                ?? string.Empty;
+        }
+        else
+        {
+            // Admin initiating checkout on behalf of a resident
+            if (!body.TryGetProperty("residentId", out var residentProp))
+                return BadRequest(new { code = "RESIDENT_ID_REQUIRED", message = "residentId is required." });
+
+            residentId = residentProp.GetString() ?? string.Empty;
+            ownerAdminId = currentUser.ExternalId;
+        }
 
         var payerEmail = body.TryGetProperty("payerEmail", out var emailProp)
-            ? emailProp.GetString()
-            : null;
+            ? emailProp.GetString() ?? currentUser.Email
+            : currentUser.Email;
 
         var frontendBaseUrl = body.TryGetProperty("frontendBaseUrl", out var frontendProp)
             ? frontendProp.GetString()
@@ -102,12 +145,10 @@ public class MercadoPagoController(
                     frontendBaseUrl),
                 ct);
 
-            var demo = string.Equals(result.PreferenceId, "DEMO", StringComparison.OrdinalIgnoreCase);
             return Ok(new
             {
                 preferenceId = result.PreferenceId,
                 initPoint = result.InitPoint,
-                demo,
             });
         }
         catch (InvalidOperationException ex)
@@ -127,13 +168,55 @@ public class MercadoPagoController(
     public async Task<IActionResult> ConfirmMaintenancePayment(
         [FromBody] JsonElement body, CancellationToken ct)
     {
-        if (!body.TryGetProperty("residentId", out var residentProp))
-            return BadRequest(new { code = "RESIDENT_ID_REQUIRED", message = "residentId is required." });
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (string.IsNullOrWhiteSpace(currentUserId))
+            return Unauthorized(new { code = "UNAUTHORIZED", message = "Token de autenticación inválido." });
 
-        var residentId = residentProp.GetString() ?? string.Empty;
-        var ownerAdminId = body.TryGetProperty("ownerAdminId", out var ownerProp)
-            ? ownerProp.GetString() ?? string.Empty
-            : string.Empty;
+        var currentUser = await userRepository.FindByExternalIdAsync(currentUserId, ct);
+        if (currentUser is null)
+            return Unauthorized(new { code = "USER_NOT_FOUND", message = "Usuario autenticado no encontrado." });
+
+        if (body.TryGetProperty("demo", out var demoProp) && demoProp.GetBoolean())
+        {
+            return BadRequest(new
+            {
+                code = "DEMO_NOT_ALLOWED",
+                message = "La conciliación directa en modo demo está deshabilitada por motivos de seguridad."
+            });
+        }
+
+        string residentId;
+        string ownerAdminId;
+
+        if (currentUser.Role == "resident")
+        {
+            if (body.TryGetProperty("residentId", out var bodyResidentProp))
+            {
+                var bodyResident = bodyResidentProp.GetString();
+                if (!string.IsNullOrWhiteSpace(bodyResident) &&
+                    !string.Equals(bodyResident, currentUser.ExternalId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        code = "FORBIDDEN_RESIDENT_MISMATCH",
+                        message = "No puede confirmar pagos de otro residente."
+                    });
+                }
+            }
+
+            residentId = currentUser.ExternalId;
+            ownerAdminId = currentUser.OwnerAdmin?.ExternalId
+                ?? User.FindFirstValue("ownerAdminId")
+                ?? string.Empty;
+        }
+        else
+        {
+            if (!body.TryGetProperty("residentId", out var residentProp))
+                return BadRequest(new { code = "RESIDENT_ID_REQUIRED", message = "residentId is required." });
+
+            residentId = residentProp.GetString() ?? string.Empty;
+            ownerAdminId = currentUser.ExternalId;
+        }
 
         long? paymentId = null;
         if (body.TryGetProperty("paymentId", out var paymentProp))
@@ -144,12 +227,19 @@ public class MercadoPagoController(
                 paymentId = parsed;
         }
 
-        var demo = body.TryGetProperty("demo", out var demoProp) && demoProp.GetBoolean();
+        if (!paymentId.HasValue || paymentId.Value <= 0)
+        {
+            return BadRequest(new
+            {
+                code = "PAYMENT_ID_REQUIRED",
+                message = "Se requiere el ID de transacción generado por Mercado Pago para validar y conciliar el pago."
+            });
+        }
 
         try
         {
             var result = await mercadoPagoService.ConfirmMaintenancePaymentAsync(
-                new ConfirmMaintenancePaymentRequest(residentId, ownerAdminId, paymentId, demo),
+                new ConfirmMaintenancePaymentRequest(residentId, ownerAdminId, paymentId, AllowDemo: false),
                 ct);
 
             return Ok(new
@@ -161,6 +251,7 @@ public class MercadoPagoController(
         }
         catch (InvalidOperationException ex)
         {
+            logger.LogWarning("Maintenance confirm rejected: {Message}", ex.Message);
             return BadRequest(new { code = "CONFIRM_FAILED", message = ex.Message });
         }
         catch (Exception ex)
@@ -287,6 +378,7 @@ public class MercadoPagoController(
         var signature = Request.Headers["x-signature"].FirstOrDefault();
         var requestId = Request.Headers["x-request-id"].FirstOrDefault();
 
+        // Enforce signature validation
         if (!MercadoPagoWebhookValidator.TryValidateSignature(
                 signature, requestId, dataId, _settings.WebhookSecret, out var sigFailure))
         {

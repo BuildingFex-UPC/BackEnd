@@ -9,13 +9,16 @@ public static class MercadoPagoWebhookValidator
         string? signatureHeader,
         string? requestId,
         string? dataId,
-        string webhookSecret,
+        string? webhookSecret,
         out string? failureReason)
     {
         failureReason = null;
 
         if (string.IsNullOrWhiteSpace(webhookSecret))
-            return true;
+        {
+            failureReason = "webhook_secret_not_configured";
+            return false;
+        }
 
         if (string.IsNullOrWhiteSpace(signatureHeader))
         {
@@ -31,8 +34,8 @@ public static class MercadoPagoWebhookValidator
             var kv = part.Split('=', 2, StringSplitOptions.TrimEntries);
             if (kv.Length != 2) continue;
 
-            if (kv[0] == "ts") ts = kv[1];
-            if (kv[0] == "v1") receivedHash = kv[1];
+            if (string.Equals(kv[0], "ts", StringComparison.OrdinalIgnoreCase)) ts = kv[1];
+            if (string.Equals(kv[0], "v1", StringComparison.OrdinalIgnoreCase)) receivedHash = kv[1];
         }
 
         if (string.IsNullOrWhiteSpace(ts) || string.IsNullOrWhiteSpace(receivedHash))
@@ -42,10 +45,14 @@ public static class MercadoPagoWebhookValidator
         }
 
         var manifest = $"id:{dataId ?? string.Empty};request-id:{requestId ?? string.Empty};ts:{ts};";
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(webhookSecret));
-        var computed = Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(manifest))).ToLowerInvariant();
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(webhookSecret.Trim()));
+        var computedHash = Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(manifest))).ToLowerInvariant();
 
-        if (!string.Equals(computed, receivedHash, StringComparison.OrdinalIgnoreCase))
+        byte[] computedBytes = Encoding.UTF8.GetBytes(computedHash);
+        byte[] receivedBytes = Encoding.UTF8.GetBytes(receivedHash.ToLowerInvariant());
+
+        if (computedBytes.Length != receivedBytes.Length ||
+            !CryptographicOperations.FixedTimeEquals(computedBytes, receivedBytes))
         {
             failureReason = "signature_mismatch";
             return false;
