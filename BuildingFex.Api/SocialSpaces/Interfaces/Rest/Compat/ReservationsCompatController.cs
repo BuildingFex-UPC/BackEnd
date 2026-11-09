@@ -3,8 +3,11 @@ using BuildingFex.Api.SocialSpaces.Domain.Model.Aggregates;
 using BuildingFex.Api.SocialSpaces.Domain.Repositories;
 using BuildingFex.Api.SocialSpaces.Interfaces.Rest.Transform;
 using BuildingFex.Api.Shared.Domain.Repositories;
+using BuildingFex.Api.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Text.Json;
 
 namespace BuildingFex.Api.SocialSpaces.Interfaces.Rest.Compat;
@@ -15,7 +18,8 @@ namespace BuildingFex.Api.SocialSpaces.Interfaces.Rest.Compat;
 public class ReservationsCompatController(
     IReservationRepository reservationRepository,
     SocialSpacesOwnerResolver ownerResolver,
-    IUnitOfWork unitOfWork) : ControllerBase
+    IUnitOfWork unitOfWork,
+    AppDbContext context) : ControllerBase
 {
     [HttpGet]
     [AllowAnonymous]
@@ -80,6 +84,14 @@ public class ReservationsCompatController(
         if (!IsValidTimeRange(startTime, endTime))
             return BadRequest(new { code = "RESERVATION_TIME_INVALID", message = "Horario inválido." });
 
+        if (!DateOnly.TryParseExact(reservationDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+            return BadRequest(new { code = "RESERVATION_DATE_INVALID", message = "Fecha inválida." });
+
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var lockKey = JsonSerializer.Serialize(new[] { owner.ExternalId, spaceId, reservationDate });
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", ct);
+
         var existing = await reservationRepository.ListAsync(
             owner.ExternalId,
             spaceId,
@@ -119,6 +131,7 @@ public class ReservationsCompatController(
 
         await reservationRepository.AddAsync(reservation, ct);
         await unitOfWork.CompleteAsync(ct);
+        await transaction.CommitAsync(ct);
 
         var created = await reservationRepository.FindByExternalIdAsync(externalId, ct);
         return StatusCode(StatusCodes.Status201Created, SocialSpacesCompatSerializer.ReservationToJson(created!));
