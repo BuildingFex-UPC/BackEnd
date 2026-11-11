@@ -18,6 +18,7 @@ public class MercadoPagoServiceTests
     private readonly Mock<IReceiptRepository> _receiptRepoMock = new();
     private readonly Mock<IFeeRepository> _feeRepoMock = new();
     private readonly Mock<IPaymentRepository> _paymentRepoMock = new();
+    private readonly Mock<IMaintenanceCheckoutOrderRepository> _orderRepoMock = new();
     private readonly Mock<IUserRepository> _userRepoMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<ILogger<MercadoPagoService>> _loggerMock = new();
@@ -47,6 +48,7 @@ public class MercadoPagoServiceTests
             _receiptRepoMock.Object,
             _feeRepoMock.Object,
             _paymentRepoMock.Object,
+            _orderRepoMock.Object,
             _userRepoMock.Object,
             _ownerResolver,
             _unitOfWorkMock.Object,
@@ -92,7 +94,13 @@ public class MercadoPagoServiceTests
             It.Is<global::MercadoPago.Client.Preference.PreferenceRequest>(p =>
                 p.Items.First().UnitPrice == 265m &&
                 p.Items.First().CurrencyId == "PEN" &&
-                p.ExternalReference == "MAINTENANCE:res-1:admin-1"),
+                p.ExternalReference.StartsWith("MAINTENANCE:res-1:admin-1:ORD-")),
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        _orderRepoMock.Verify(o => o.AddAsync(
+            It.Is<MaintenanceCheckoutOrder>(order =>
+                order.ResidentExternalId == "res-1" &&
+                order.TotalAmount == 265m),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -285,7 +293,7 @@ public class MercadoPagoServiceTests
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.ConfirmMaintenancePaymentAsync(new ConfirmMaintenancePaymentRequest("res-1", "admin-1", 556677)));
 
-        Assert.Contains("menor al total adeudado", ex.Message);
+        Assert.Contains("no coincide exactamente", ex.Message);
         Assert.Equal("Pendiente", fee.Status);
     }
 
@@ -423,6 +431,103 @@ public class MercadoPagoServiceTests
         Assert.Equal("approved", result.Status);
         Assert.Equal("Paid", receipt.Status);
         _unitOfWorkMock.Verify(u => u.CompleteAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ConfirmMaintenancePayment_WithCheckoutOrder_Approved_ReconcilesOrderCuotas()
+    {
+        // Arrange
+        var admin = CreateAdminUser("admin-1");
+        _userRepoMock.Setup(u => u.FindByExternalIdAsync("admin-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(admin);
+
+        var order = MaintenanceCheckoutOrder.Create(
+            "ORD-TEST-123",
+            1,
+            "res-1",
+            150m,
+            new[] { "R-1" },
+            Array.Empty<string>());
+
+        _orderRepoMock.Setup(o => o.FindByExternalIdAsync("ORD-TEST-123", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+
+        var receipt = Receipt.Create("R-1", 1, "res-1", "2026-01-01", "2026-01-15", 150m, "Pending", 0m, 0m, "Mantenimiento Enero");
+        _receiptRepoMock.Setup(r => r.FindByExternalIdAsync("R-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(receipt);
+        _paymentRepoMock.Setup(p => p.ListAsync("admin-1", "res-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Payment>());
+
+        var mpPayment = new MercadoPagoPaymentData(
+            Id: 101010,
+            Status: "approved",
+            StatusDetail: "accredited",
+            CurrencyId: "PEN",
+            TransactionAmount: 150m,
+            ExternalReference: "MAINTENANCE:res-1:admin-1:ORD-TEST-123",
+            DateApproved: DateTime.UtcNow,
+            PaymentMethodId: "visa");
+
+        _gatewayMock.Setup(g => g.GetPaymentAsync(101010, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mpPayment);
+
+        var service = CreateService();
+
+        // Act
+        var result = await service.ConfirmMaintenancePaymentAsync(
+            new ConfirmMaintenancePaymentRequest("res-1", "admin-1", 101010));
+
+        // Assert
+        Assert.True(result.Reconciled);
+        Assert.Equal(1, result.ItemsPaid);
+        Assert.Equal("Paid", receipt.Status);
+        Assert.Equal("Approved", order.Status);
+        _orderRepoMock.Verify(o => o.Update(order), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CompleteAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ConfirmMaintenancePayment_WithCheckoutOrder_AmountMismatch_ThrowsException()
+    {
+        // Arrange
+        var admin = CreateAdminUser("admin-1");
+        _userRepoMock.Setup(u => u.FindByExternalIdAsync("admin-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(admin);
+
+        var order = MaintenanceCheckoutOrder.Create(
+            "ORD-TEST-456",
+            1,
+            "res-1",
+            250m,
+            new[] { "R-1" },
+            new[] { "F-1" });
+
+        _orderRepoMock.Setup(o => o.FindByExternalIdAsync("ORD-TEST-456", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+
+        var mpPayment = new MercadoPagoPaymentData(
+            Id: 202020,
+            Status: "approved",
+            StatusDetail: "accredited",
+            CurrencyId: "PEN",
+            TransactionAmount: 200m, // Mismatched: paid 200 instead of 250
+            ExternalReference: "MAINTENANCE:res-1:admin-1:ORD-TEST-456",
+            DateApproved: DateTime.UtcNow,
+            PaymentMethodId: "visa");
+
+        _gatewayMock.Setup(g => g.GetPaymentAsync(202020, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mpPayment);
+
+        var service = CreateService();
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ConfirmMaintenancePaymentAsync(
+                new ConfirmMaintenancePaymentRequest("res-1", "admin-1", 202020)));
+
+        Assert.Contains("no coincide exactamente con el importe adeudado del checkout", ex.Message);
+        Assert.Equal("Pending", order.Status);
+        _unitOfWorkMock.Verify(u => u.CompleteAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }
 

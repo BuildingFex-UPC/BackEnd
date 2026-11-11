@@ -68,3 +68,12 @@ public interface IFixedPayoutRecipientRepository
     void Update(FixedPayoutRecipient entity);
     Task<bool> AnyAsync(CancellationToken cancellationToken = default);
 }
+
+public interface IMaintenanceCheckoutOrderRepository
+{
+    Task<MaintenanceCheckoutOrder?> FindByExternalIdAsync(string externalId, CancellationToken cancellationToken = default);
+    Task<MaintenanceCheckoutOrder?> FindByPreferenceIdAsync(string preferenceId, CancellationToken cancellationToken = default);
+    Task<MaintenanceCheckoutOrder?> FindByMpPaymentIdAsync(string mpPaymentId, CancellationToken cancellationToken = default);
+    Task AddAsync(MaintenanceCheckoutOrder entity, CancellationToken cancellationToken = default);
+    void Update(MaintenanceCheckoutOrder entity);
+}

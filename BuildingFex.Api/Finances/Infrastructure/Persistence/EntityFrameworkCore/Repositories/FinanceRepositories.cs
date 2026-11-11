@@ -243,3 +243,40 @@ public class FixedPayoutRecipientRepository(AppDbContext context)
     public async Task<bool> AnyAsync(CancellationToken cancellationToken = default)
         => await Context.Set<FixedPayoutRecipient>().AnyAsync(cancellationToken);
 }
+
+public class MaintenanceCheckoutOrderRepository(AppDbContext context)
+    : BaseRepository<MaintenanceCheckoutOrder>(context), IMaintenanceCheckoutOrderRepository
+{
+    public async Task<MaintenanceCheckoutOrder?> FindByExternalIdAsync(
+        string externalId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(externalId))
+            return null;
+
+        return await Context.Set<MaintenanceCheckoutOrder>()
+            .FirstOrDefaultAsync(o => o.ExternalId == externalId.Trim(), cancellationToken);
+    }
+
+    public async Task<MaintenanceCheckoutOrder?> FindByPreferenceIdAsync(
+        string preferenceId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(preferenceId))
+            return null;
+
+        return await Context.Set<MaintenanceCheckoutOrder>()
+            .FirstOrDefaultAsync(o => o.PreferenceId == preferenceId.Trim(), cancellationToken);
+    }
+
+    public async Task<MaintenanceCheckoutOrder?> FindByMpPaymentIdAsync(
+        string mpPaymentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(mpPaymentId))
+            return null;
+
+        return await Context.Set<MaintenanceCheckoutOrder>()
+            .FirstOrDefaultAsync(o => o.MpPaymentId == mpPaymentId.Trim(), cancellationToken);
+    }
+}

@@ -125,5 +125,21 @@ public static class ModelBuilderExtensions
             entity.HasOne(r => r.OwnerAdmin).WithMany().HasForeignKey(r => r.OwnerAdminId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        builder.Entity<MaintenanceCheckoutOrder>(entity =>
+        {
+            entity.HasKey(o => o.Id);
+            entity.Property(o => o.Id).ValueGeneratedOnAdd();
+            entity.Property(o => o.ExternalId).HasMaxLength(64).IsRequired();
+            entity.HasIndex(o => o.ExternalId).IsUnique();
+            entity.Property(o => o.PreferenceId).HasMaxLength(64).IsRequired();
+            entity.HasIndex(o => o.PreferenceId);
+            entity.Property(o => o.ResidentExternalId).HasMaxLength(64).IsRequired();
+            entity.Property(o => o.TotalAmount).HasPrecision(18, 2);
+            entity.Property(o => o.Status).HasMaxLength(32).IsRequired();
+            entity.Property(o => o.ReceiptIdsJson).HasColumnType("text");
+            entity.Property(o => o.FeeIdsJson).HasColumnType("text");
+            entity.Property(o => o.MpPaymentId).HasMaxLength(64);
+        });
     }
 }
