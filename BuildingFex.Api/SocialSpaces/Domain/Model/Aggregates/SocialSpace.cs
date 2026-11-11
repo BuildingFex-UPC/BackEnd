@@ -1,3 +1,4 @@
+
 using BuildingFex.Api.Iam.Domain.Model.Aggregates;
 using BuildingFex.Api.Shared.Domain.Model.Entities;
 
@@ -13,6 +14,7 @@ public class SocialSpace : IAuditableEntity
     public string Description { get; private set; } = string.Empty;
     public int? Capacity { get; private set; }
     public string ImageUrl { get; private set; } = string.Empty;
+    public decimal Cost { get; private set; }
     public DateTimeOffset? CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 
@@ -24,7 +26,8 @@ public class SocialSpace : IAuditableEntity
         string name,
         string description,
         int? capacity,
-        string imageUrl)
+        string imageUrl,
+        decimal cost)
     {
         return new SocialSpace
         {
@@ -34,14 +37,22 @@ public class SocialSpace : IAuditableEntity
             Description = description,
             Capacity = capacity,
             ImageUrl = imageUrl,
+            Cost = cost
         };
     }
 
-    public void Patch(string name, string description, int? capacity, string? imageUrl)
+    public void Patch(
+        string name,
+        string description,
+        int? capacity,
+        string? imageUrl,
+        decimal cost)
     {
         Name = name;
         Description = description;
         Capacity = capacity;
+        Cost = cost;
+
         if (imageUrl is not null)
             ImageUrl = imageUrl;
     }

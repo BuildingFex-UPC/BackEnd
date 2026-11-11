@@ -16,6 +16,9 @@ public static class ModelBuilderExtensions
             entity.Property(s => s.Name).HasMaxLength(200).IsRequired();
             entity.Property(s => s.Description).HasMaxLength(2000);
             entity.Property(s => s.ImageUrl).HasColumnType("text");
+            entity.Property(s => s.Cost)
+                .HasPrecision(10, 2)
+                .IsRequired();
             entity.HasOne(s => s.OwnerAdmin)
                 .WithMany()
                 .HasForeignKey(s => s.OwnerAdminId)

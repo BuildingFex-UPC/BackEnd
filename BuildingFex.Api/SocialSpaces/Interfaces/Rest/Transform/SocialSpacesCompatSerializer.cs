@@ -11,6 +11,7 @@ public static class SocialSpacesCompatSerializer
         name = space.Name,
         description = space.Description,
         capacity = space.Capacity,
+        cost = space.Cost,
         imageUrl = space.ImageUrl,
         ownerAdminId = space.OwnerAdmin?.ExternalId ?? string.Empty,
     };
