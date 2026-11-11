@@ -57,13 +57,17 @@ public class SocialSpacesCompatController(
         if (body.TryGetProperty("capacity", out var capProp) && capProp.ValueKind == JsonValueKind.Number)
             capacity = capProp.GetInt32();
 
+        var cost = body.TryGetProperty("cost", out var costElement)
+            ? costElement.GetDecimal()
+            : 0m;
+
         var space = SocialSpace.Create(
             externalId,
             owner.Id,
             name,
             body.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? string.Empty : string.Empty,
             capacity,
-            body.TryGetProperty("imageUrl", out var imgProp) ? imgProp.GetString() ?? string.Empty : string.Empty);
+            body.TryGetProperty("imageUrl", out var imgProp) ? imgProp.GetString() ?? string.Empty : string.Empty, cost);
 
         await socialSpaceRepository.AddAsync(space, ct);
         await unitOfWork.CompleteAsync(ct);
@@ -87,15 +91,20 @@ public class SocialSpacesCompatController(
         if (body.TryGetProperty("capacity", out var capProp))
             capacity = capProp.ValueKind == JsonValueKind.Null ? null : capProp.GetInt32();
 
+        var cost = body.TryGetProperty("cost", out var costElement)
+            ? costElement.GetDecimal()
+            : space.Cost;
+
         string? imageUrl = body.TryGetProperty("imageUrl", out var imgProp)
             ? imgProp.GetString() ?? string.Empty
             : null;
 
         space.Patch(
-            name,
-            body.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? string.Empty : space.Description,
-            capacity,
-            imageUrl);
+          name,
+          body.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? string.Empty : space.Description,
+          capacity,
+          imageUrl,
+          cost);
 
         socialSpaceRepository.Update(space);
         await unitOfWork.CompleteAsync(ct);
