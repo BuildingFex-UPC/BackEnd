@@ -30,6 +30,7 @@ using BuildingFex.Api.Information.Domain.Repositories;
 using BuildingFex.Api.Information.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using BuildingFex.Api.Information.Infrastructure.Persistence.Seeding;
 using BuildingFex.Api.SocialSpaces.Application.Internal;
+using BuildingFex.Api.SocialSpaces.Domain.Model.Aggregates;
 using BuildingFex.Api.SocialSpaces.Domain.Repositories;
 using BuildingFex.Api.SocialSpaces.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using BuildingFex.Api.SocialSpaces.Infrastructure.Persistence.Seeding;
@@ -204,6 +205,34 @@ using (var scope = app.Services.CreateScope())
         // Non-fatal: if the column is already there or the DB user can't alter,
         // log and keep booting (the profile endpoint simply won't persist avatar).
         Console.WriteLine($"[startup] no se pudo asegurar la columna avatar: {ex.Message}");
+    }
+
+    // Mismo caso que avatar: social_spaces.Cost (añadido después del primer
+    // despliegue) no lo crea EnsureCreated sobre una BD existente y este repo
+    // no aplica migraciones EF, así que la columna se agrega aquí de forma
+    // idempotente. El DEFAULT 0 es solo para las filas existentes; EF siempre
+    // envía el valor explícito en los INSERT porque el modelo no define default.
+    try
+    {
+        var spaceEntity = context.Model.FindEntityType(typeof(SocialSpace));
+        var tableName = spaceEntity?.GetTableName();
+        var columnName = spaceEntity?.FindProperty(nameof(SocialSpace.Cost))?.GetColumnName();
+        if (spaceEntity is not null && !string.IsNullOrEmpty(tableName) && !string.IsNullOrEmpty(columnName))
+        {
+            var schema = spaceEntity.GetSchema();
+            var quotedTable = string.IsNullOrEmpty(schema)
+                ? $"\"{tableName}\""
+                : $"\"{schema}\".\"{tableName}\"";
+            context.Database.ExecuteSqlRaw(
+                $"ALTER TABLE {quotedTable} ADD COLUMN IF NOT EXISTS \"{columnName}\" numeric(10,2) NOT NULL DEFAULT 0");
+        }
+    }
+    catch (Exception ex)
+    {
+        // Non-fatal: si la columna ya existe o el usuario de la BD no puede
+        // alterar, se registra y el arranque continúa (el endpoint de espacios
+        // comunes fallará al leer/escribir Cost hasta que se corrija a mano).
+        Console.WriteLine($"[startup] no se pudo asegurar la columna cost: {ex.Message}");
     }
 
     try
