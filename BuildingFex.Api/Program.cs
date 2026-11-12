@@ -235,6 +235,40 @@ using (var scope = app.Services.CreateScope())
         Console.WriteLine($"[startup] no se pudo asegurar la columna cost: {ex.Message}");
     }
 
+    // US19: rules y underMaintenance se añadieron después del primer despliegue,
+    // mismo caso que avatar/cost. Se agregan de forma idempotente al arrancar.
+    // DEFAULT solo aplica a filas existentes; EF envía el valor explícito.
+    try
+    {
+        var spaceEntity = context.Model.FindEntityType(typeof(SocialSpace));
+        var tableName = spaceEntity?.GetTableName();
+        var rulesColumn = spaceEntity?.FindProperty(nameof(SocialSpace.Rules))?.GetColumnName();
+        var maintenanceColumn = spaceEntity?.FindProperty(nameof(SocialSpace.UnderMaintenance))?.GetColumnName();
+        if (spaceEntity is not null && !string.IsNullOrEmpty(tableName))
+        {
+            var schema = spaceEntity.GetSchema();
+            var quotedTable = string.IsNullOrEmpty(schema)
+                ? $"\"{tableName}\""
+                : $"\"{schema}\".\"{tableName}\"";
+            if (!string.IsNullOrEmpty(rulesColumn))
+            {
+                context.Database.ExecuteSqlRaw(
+                    $"ALTER TABLE {quotedTable} ADD COLUMN IF NOT EXISTS \"{rulesColumn}\" text NOT NULL DEFAULT ''");
+            }
+            if (!string.IsNullOrEmpty(maintenanceColumn))
+            {
+                context.Database.ExecuteSqlRaw(
+                    $"ALTER TABLE {quotedTable} ADD COLUMN IF NOT EXISTS \"{maintenanceColumn}\" boolean NOT NULL DEFAULT false");
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        // Non-fatal: si las columnas ya existen o el usuario de la BD no puede
+        // alterar, se registra y el arranque continúa.
+        Console.WriteLine($"[startup] no se pudieron asegurar las columnas rules/under_maintenance: {ex.Message}");
+    }
+
     try
     {
         context.Database.ExecuteSqlRaw(@"

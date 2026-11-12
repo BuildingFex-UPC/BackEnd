@@ -15,6 +15,13 @@ public class SocialSpace : IAuditableEntity
     public int? Capacity { get; private set; }
     public string ImageUrl { get; private set; } = string.Empty;
     public decimal Cost { get; private set; }
+
+    /// <summary>Reglas de uso del área común (US19).</summary>
+    public string Rules { get; private set; } = string.Empty;
+
+    /// <summary>Indica si el área está en mantenimiento y no admite reservas (US19).</summary>
+    public bool UnderMaintenance { get; private set; }
+
     public DateTimeOffset? CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 
@@ -27,7 +34,9 @@ public class SocialSpace : IAuditableEntity
         string description,
         int? capacity,
         string imageUrl,
-        decimal cost)
+        decimal cost,
+        string rules = "",
+        bool underMaintenance = false)
     {
         return new SocialSpace
         {
@@ -37,7 +46,9 @@ public class SocialSpace : IAuditableEntity
             Description = description,
             Capacity = capacity,
             ImageUrl = imageUrl,
-            Cost = cost
+            Cost = cost,
+            Rules = rules ?? string.Empty,
+            UnderMaintenance = underMaintenance
         };
     }
 
@@ -46,7 +57,9 @@ public class SocialSpace : IAuditableEntity
         string description,
         int? capacity,
         string? imageUrl,
-        decimal cost)
+        decimal cost,
+        string? rules = null,
+        bool? underMaintenance = null)
     {
         Name = name;
         Description = description;
@@ -55,5 +68,11 @@ public class SocialSpace : IAuditableEntity
 
         if (imageUrl is not null)
             ImageUrl = imageUrl;
+
+        if (rules is not null)
+            Rules = rules;
+
+        if (underMaintenance.HasValue)
+            UnderMaintenance = underMaintenance.Value;
     }
 }
