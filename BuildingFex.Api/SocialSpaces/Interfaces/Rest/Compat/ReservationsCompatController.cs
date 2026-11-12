@@ -17,6 +17,7 @@ namespace BuildingFex.Api.SocialSpaces.Interfaces.Rest.Compat;
 [Authorize]
 public class ReservationsCompatController(
     IReservationRepository reservationRepository,
+    ISocialSpaceRepository socialSpaceRepository,
     SocialSpacesOwnerResolver ownerResolver,
     IUnitOfWork unitOfWork,
     AppDbContext context) : ControllerBase
@@ -86,6 +87,19 @@ public class ReservationsCompatController(
 
         if (!DateOnly.TryParseExact(reservationDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
             return BadRequest(new { code = "RESERVATION_DATE_INVALID", message = "Fecha inválida." });
+
+        // US19 (AC02): un espacio en mantenimiento no admite nuevas reservas.
+        // Se valida antes de abrir la transacción/candado para no tomar el lock.
+        var space = await socialSpaceRepository.FindByExternalIdAsync(spaceId, ct);
+        if (space is null)
+            return BadRequest(new { code = "SPACE_NOT_FOUND", message = "Espacio no encontrado." });
+
+        if (space.UnderMaintenance)
+            return BadRequest(new
+            {
+                code = "SPACE_UNDER_MAINTENANCE",
+                message = "El área común está en mantenimiento y no admite reservas.",
+            });
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
         var lockKey = JsonSerializer.Serialize(new[] { owner.ExternalId, spaceId, reservationDate });

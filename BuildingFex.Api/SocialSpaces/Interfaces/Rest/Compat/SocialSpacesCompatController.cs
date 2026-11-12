@@ -61,13 +61,23 @@ public class SocialSpacesCompatController(
             ? costElement.GetDecimal()
             : 0m;
 
+        // US19: reglas de uso y estado de mantenimiento (opcionales).
+        var rules = body.TryGetProperty("rules", out var rulesProp)
+            ? rulesProp.GetString() ?? string.Empty
+            : string.Empty;
+
+        var underMaintenance = body.TryGetProperty("underMaintenance", out var maintProp)
+            && maintProp.ValueKind == JsonValueKind.True;
+
         var space = SocialSpace.Create(
             externalId,
             owner.Id,
             name,
             body.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? string.Empty : string.Empty,
             capacity,
-            body.TryGetProperty("imageUrl", out var imgProp) ? imgProp.GetString() ?? string.Empty : string.Empty, cost);
+            body.TryGetProperty("imageUrl", out var imgProp) ? imgProp.GetString() ?? string.Empty : string.Empty, cost,
+            rules,
+            underMaintenance);
 
         await socialSpaceRepository.AddAsync(space, ct);
         await unitOfWork.CompleteAsync(ct);
@@ -99,12 +109,25 @@ public class SocialSpacesCompatController(
             ? imgProp.GetString() ?? string.Empty
             : null;
 
+        // US19: si el campo no viene en el body se conserva el valor actual.
+        string? rules = body.TryGetProperty("rules", out var rulesProp)
+            ? rulesProp.GetString() ?? string.Empty
+            : null;
+
+        bool? underMaintenance = body.TryGetProperty("underMaintenance", out var maintProp)
+            ? maintProp.ValueKind == JsonValueKind.Null
+                ? null
+                : maintProp.GetBoolean()
+            : null;
+
         space.Patch(
           name,
           body.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? string.Empty : space.Description,
           capacity,
           imageUrl,
-          cost);
+          cost,
+          rules,
+          underMaintenance);
 
         socialSpaceRepository.Update(space);
         await unitOfWork.CompleteAsync(ct);

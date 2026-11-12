@@ -99,6 +99,13 @@ public class DbJsonSocialSpacesSeeder(
                 ? costElement.GetDecimal()
                 : 0m;
 
+            var rules = entry.TryGetProperty("rules", out var rulesProp)
+                ? rulesProp.GetString() ?? string.Empty
+                : string.Empty;
+
+            var underMaintenance = entry.TryGetProperty("underMaintenance", out var maintProp) &&
+                                   maintProp.ValueKind == JsonValueKind.True;
+
             var space = SocialSpace.Create(
                 externalId,
                 ownerId.Value,
@@ -106,7 +113,9 @@ public class DbJsonSocialSpacesSeeder(
                 entry.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? string.Empty : string.Empty,
                 capacity,
                 imageUrl,
-                cost);
+                cost,
+                rules,
+                underMaintenance);
 
             await socialSpaceRepository.AddAsync(space, ct);
             count++;

@@ -19,6 +19,8 @@ public static class ModelBuilderExtensions
             entity.Property(s => s.Cost)
                 .HasPrecision(10, 2)
                 .IsRequired();
+            entity.Property(s => s.Rules).HasMaxLength(2000);
+            entity.Property(s => s.UnderMaintenance).IsRequired();
             entity.HasOne(s => s.OwnerAdmin)
                 .WithMany()
                 .HasForeignKey(s => s.OwnerAdminId)
