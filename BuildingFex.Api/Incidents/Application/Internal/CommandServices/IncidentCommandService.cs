@@ -4,17 +4,17 @@ using BuildingFex.Api.Incidents.Domain.Model;
 using BuildingFex.Api.Incidents.Domain.Model.Aggregates;
 using BuildingFex.Api.Incidents.Domain.Model.Commands;
 using BuildingFex.Api.Incidents.Domain.Repositories;
+using BuildingFex.Api.Notifications.Application.CommandServices;
 using BuildingFex.Api.Shared.Application.Model;
 using BuildingFex.Api.Shared.Domain.Repositories;
-namespace BuildingFex.Api.Incidents.Application.Internal.CommandServices;
 
+namespace BuildingFex.Api.Incidents.Application.Internal.CommandServices;
 
 public class IncidentCommandService(
     IIncidentRepository incidentRepository,
     IUserRepository userRepository, 
+    INotificationCommandService notificationCommandService,
     IUnitOfWork unitOfWork) : IIncidentCommandService
-
-        
 {
     public async Task<Result<Incident>> Handle(
         CreateIncidentCommand command,
@@ -38,7 +38,6 @@ public class IncidentCommandService(
         var externalId = string.IsNullOrWhiteSpace(command.ExternalId)
             ? $"incident-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}"
             : command.ExternalId.Trim();
-        
 
         var incident = Incident.Create(
             externalId,
@@ -52,7 +51,27 @@ public class IncidentCommandService(
 
         await incidentRepository.AddAsync(incident, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
-        
+
+        // Notificar al administrador sobre el nuevo reporte de incidente
+        try
+        {
+            var residentDisplayName = !string.IsNullOrWhiteSpace(command.ResidentName)
+                ? command.ResidentName
+                : (!string.IsNullOrWhiteSpace(command.ResidentExternalId) ? command.ResidentExternalId : "un residente");
+
+            await notificationCommandService.CreateNotificationAsync(
+                recipientExternalId: owner.ExternalId,
+                recipientRole: "admin",
+                title: "Nuevo incidente reportado",
+                message: $"El residente {residentDisplayName} ha reportado: {command.Description}",
+                type: "incident_reported",
+                relatedEntityId: externalId,
+                ct: cancellationToken);
+        }
+        catch
+        {
+            // La notificación es complementaria; no interrumpe la creación del incidente
+        }
 
         var created = await incidentRepository.FindByExternalIdAsync(externalId, cancellationToken);
         return Result<Incident>.Success(created!);
@@ -68,6 +87,8 @@ public class IncidentCommandService(
 
         if (string.IsNullOrWhiteSpace(command.Description))
             return Result<Incident>.Failure(IncidentError.DescriptionRequired, "La descripción es obligatoria.");
+
+        var previousStatus = incident.Status;
 
         try
         {
@@ -85,6 +106,29 @@ public class IncidentCommandService(
 
         incidentRepository.Update(incident);
         await unitOfWork.CompleteAsync(cancellationToken);
+
+        // Si el estado cambió a 'resolved', notificar al residente que reportó
+        var newStatus = incident.Status;
+        if (string.Equals(newStatus, IncidentStatuses.Resolved, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(previousStatus, IncidentStatuses.Resolved, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(incident.ResidentExternalId))
+        {
+            try
+            {
+                await notificationCommandService.CreateNotificationAsync(
+                    recipientExternalId: incident.ResidentExternalId,
+                    recipientRole: "resident",
+                    title: "Incidente resuelto",
+                    message: $"Tu incidente '{incident.Description}' ha sido resuelto.",
+                    type: "incident_resolved",
+                    relatedEntityId: incident.ExternalId,
+                    ct: cancellationToken);
+            }
+            catch
+            {
+                // La notificación es complementaria; no interrumpe la actualización del incidente
+            }
+        }
 
         var updated = await incidentRepository.FindByExternalIdAsync(command.ExternalId, cancellationToken);
         return Result<Incident>.Success(updated!);
