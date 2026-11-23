@@ -2,6 +2,7 @@ using BuildingFex.Api.Finances.Infrastructure.Persistence.EntityFrameworkCore.Co
 using BuildingFex.Api.Iam.Infrastructure.Persistence.EntityFrameworkCore.Configuration.Extensions;
 using BuildingFex.Api.Incidents.Infrastructure.Persistence.EntityFrameworkCore.Configuration.Extensions;
 using BuildingFex.Api.Information.Infrastructure.Persistence.EntityFrameworkCore.Configuration.Extensions;
+using BuildingFex.Api.Notifications.Infrastructure.Persistence.EntityFrameworkCore.Configuration.Extensions;
 using BuildingFex.Api.SocialSpaces.Infrastructure.Persistence.EntityFrameworkCore.Configuration.Extensions;
 using BuildingFex.Api.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration.Extensions;
 using BuildingFex.Api.Support.Domain.Model.Aggregates;
@@ -27,6 +28,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         builder.ApplyFinancesConfiguration();
         builder.ApplySocialSpacesConfiguration();
         builder.ApplyInformationConfiguration();
+        builder.ApplyNotificationsConfiguration();
 
         // Support chats
         builder.Entity<SupportChat>(entity =>
